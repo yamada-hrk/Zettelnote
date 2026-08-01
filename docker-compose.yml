@@ -1,0 +1,40 @@
+# ============================================================
+# Step2: 同期バックエンド(API サーバー + PostgreSQL)
+#   起動:   docker compose up -d --build
+#   停止:   docker compose down        (データは volume に保持)
+#   破棄:   docker compose down -v     (サーバー側データも削除)
+#
+# サーバーにはクライアント側で暗号化済みのデータのみが保存される
+# (ゼロ知識: サーバーは暗号化キーを一切持たない)
+# 認証はアカウント制(アプリ内から新規登録 / ログイン)
+# ============================================================
+services:
+  api:
+    build: ./server
+    ports:
+      - "8787:8787"
+    environment:
+      PORT: 8787
+      DATABASE_URL: postgres://zettel:zettel@db:5432/zettel
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: zettel
+      POSTGRES_PASSWORD: zettel
+      POSTGRES_DB: zettel
+    volumes:
+      - zettel-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zettel -d zettel"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  zettel-db:

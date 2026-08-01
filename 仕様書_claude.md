@@ -1,6 +1,6 @@
 # ローカル・ツェッテルカステン 仕様書
 
-- 対象バージョン: **v0.1.3**
+- 対象バージョン: **v0.2.0**
 - 最終更新日: 2026-08-01
 - 本書はアプリの全機能仕様を記述する正本である。追加要件・変更は本書の構造を保ったまま該当セクション(または「Active Context」)に追記すること。
 
@@ -26,6 +26,8 @@
 | DB | SQLite (better-sqlite3) | 同期 API。WAL モード |
 | Markdown | marked + DOMPurify | プレビューは必ずサニタイズして表示 |
 | 検索 | 文字バイグラム TF-IDF + コサイン類似度(自前実装) | 埋め込みモデル不使用(完全ローカル要件のため) |
+| 同期サーバー(Step2) | Node.js / Express + PostgreSQL 16 | Docker Compose で一発起動。暗号化済みデータのみを保存するゼロ知識ストア |
+| クライアント暗号化(Step2) | Node.js crypto: scrypt + AES-256-GCM | 鍵はクライアントのみ保持。パスフレーズは Electron safeStorage でローカル保護 |
 
 ## 3. アーキテクチャ
 
@@ -50,6 +52,11 @@
 | `updateNote(id, patch)` | `notes:update` | title/body を更新(updated_at 自動更新) |
 | `deleteNote(id)` | `notes:delete` | メモを削除 |
 | `recommend({excludeId, text})` | `notes:recommend` | ベクトル/キーワード両方の関連メモ Top10 を返す(各件に `sharedTags` 付き) |
+| `syncGetStatus()` | `sync:get-status` | 同期ステータス(configured/syncing/lastSyncAt/lastError)を返す |
+| `syncConfigure(payload)` | `sync:configure` | 同期設定(serverUrl/token/passphrase)。接続・鍵検証まで行う |
+| `syncNow()` | `sync:now` | 手動同期をトリガー |
+| `syncDisable()` | `sync:disable` | 同期設定を解除(ローカルのメモは残る) |
+| `onSyncStatus(cb)` | `sync:status`(event) | ステータス変化のプッシュ購読(購読解除関数を返す) |
 
 ### 3.3 データモデル
 
@@ -66,6 +73,18 @@ CREATE TABLE notes (
 ```
 
 - ハッシュタグは**専用テーブルを持たず**、常に本文から動的抽出する(正本は本文テキスト)
+- Step2 で同期用カラム・テーブルを追加(初回起動時に自動マイグレーション):
+  - `notes.uid TEXT UNIQUE` … 端末をまたいでメモを同定する UUID
+  - `notes.updated_ms INTEGER` … LWW 競合解決用の更新時刻(epoch ms)
+  - `tombstones (uid, deleted_ms)` … 削除を他端末へ伝搬するための墓標
+
+サーバー側スキーマ(PostgreSQL / `server/index.js` が起動時に作成):
+
+```sql
+CREATE TABLE sync_meta  (id INTEGER PRIMARY KEY, salt TEXT, key_check TEXT);      -- 鍵導出メタ(平文なし)
+CREATE TABLE sync_notes (uid TEXT PRIMARY KEY, payload TEXT, iv TEXT,             -- payload は暗号文のみ
+                         updated_ms BIGINT, deleted BOOLEAN, server_ms BIGINT);
+```
 
 主要な共有型(`src/types.ts`):
 
@@ -198,6 +217,50 @@ CREATE TABLE notes (
 - **アニメーション**: `rise-in`(下からフェードイン、CSS 変数 `--rise-opacity` で最終透明度指定可) / パネル開閉スライド / ホバー拡大
 - Markdown プレビューはダーク用タイポグラフィ(コードブロック・引用・リンク等)を定義
 
+### 5.8 サーバー同期とゼロ知識暗号化(Step2)
+
+#### 5.8.0 ハイブリッド設計(ローカルファースト)
+- **既定はローカルモード**: ログイン不要でメモ作成・自動保存・ハッシュタグ・レコメンド等の全機能が即座に使える。未ログインの間、アプリはサーバーと一切通信しない
+- **クラウド同期はオプトイン**: 左サイドバー下部の ⚙ から「サーバー URL + アカウント(ログイン/新規登録) + 暗号化キー」を設定したユーザーのみ同期が有効になる
+- 「同期を解除」でいつでもローカルモードに戻れる(ローカルのメモは残る)
+- 暗号化キーはクラウド同期時のみ必要。ローカル利用では鍵は不要(ローカル DB は平文保存)
+
+#### 5.8.1 バックエンド環境(Docker Compose)
+- ルートの `docker-compose.yml` で **API サーバー(Express) + PostgreSQL 16** を一発起動:
+  - 起動 `docker compose up -d --build` / 停止 `docker compose down`(データ保持) / 破棄 `docker compose down -v`
+  - API は `http://localhost:8787`
+- **アカウント認証**(v0.2.0 で固定トークンから変更):
+  - `POST /api/auth/register` … 新規登録(アカウント名 3〜32文字の英数字 / パスワード8文字以上、scrypt ハッシュ保存)→ トークン発行
+  - `POST /api/auth/login` … ログイン → トークン発行(セッションは DB 保存・無期限)
+  - 以降の API は Bearer トークン認証で、**データはすべてユーザーごとに分離**される
+- サーバー API(`server/index.js`):
+  - `GET /api/health` … 死活確認(認証不要)
+  - `GET /api/meta` / `PUT /api/meta` … 鍵導出メタ(salt / keyCheck、ユーザーごと)。**PUT は初期化済みなら上書きせず既存を返す**(salt を壊すと全データ復号不能になるため)
+  - `GET /api/notes?since=<server_ms>` … 差分 Pull(カーソルはサーバー受信時刻 `server_ms` 基準 → 端末間の時計ずれに強い)
+  - `PUT /api/notes` … 一括 Push。**LWW**: `updated_ms` が既存より新しい場合のみ上書き
+- **アカウントのパスワードと暗号化キーは独立**: パスワードはサーバー認証専用(サーバーにはハッシュのみ保存)、暗号化キーはサーバーへ一切送信されない
+
+#### 5.8.2 ゼロ知識暗号化(`electron/crypto.js`)
+- **鍵導出**: `scrypt(NFKC 正規化したパスフレーズ, salt) → 256bit 鍵`。salt はサーバー保存(秘密情報ではない。複数端末で同一鍵を導出するために共有)
+- **暗号化**: AES-256-GCM。ノートごとにランダム 12byte IV、認証タグを暗号文末尾に連結(改ざん検知つき)
+- **平文の範囲**: `{ title, body, created_at }` を JSON 化して暗号化。サーバーが受け取るのは `uid / 暗号文 / IV / updated_ms / deleted` のみ
+- **キー検証**: 既知定数を暗号化した `keyCheck` をサーバーに保存し、接続時にクライアント側で復号検証。**不一致なら接続を拒否**(誤ったキーでのデータ破壊を防ぐ)
+- **キーの保持**: 導出鍵はメインプロセスのメモリのみ。パスフレーズは Electron **safeStorage**(Windows は DPAPI)で暗号化し `sync-config.json` にローカル保存(サーバーへは一切送らない)
+- **注意**: キーを忘れるとサーバー上のデータは復元不能(設計上の仕様)
+
+#### 5.8.3 同期ロジック(`electron/sync.js`)
+- **フロー**: ① Pull(リモート差分を復号 → LWW でローカル適用) → ② Push(ローカル差分 + 削除墓標を暗号化して一括送信) → ③ カーソル(`lastSyncMs`)をサーバー時刻で更新
+- **競合解決**: Last-Write-Wins(`updated_ms` 比較)。ローカルの方が新しい編集は削除にも勝つ
+- **削除の伝搬**: ローカル削除時に `tombstones` へ墓標を記録し、`deleted: true` で Push。Pull 側は墓標より古いリモート更新を無視
+- **トリガー**: メモの保存/作成/削除後(4秒デバウンス) / 60秒ごとの定期実行 / 起動直後 / 手動「⟳ 今すぐ同期」
+- **エラー時**: ステータスに表示して次回トリガーで自動リトライ。復号できないレコードはスキップ
+
+#### 5.8.4 同期 UI(`src/components/SyncPanel.tsx`)
+- 左サイドバー下部に常時ステータス表示: ローカルモード(グレー) / 同期中(インディゴ点滅) / 同期済み HH:MM @アカウント名(エメラルド) / エラー(赤 + メッセージ)
+- ⚙ ボタンで設定モーダル: 「ログイン / 新規登録」タブ切替 + サーバー URL / アカウント名 / パスワード(サーバー認証用) / 暗号化キー(端末内のみ)。誤ったキーは接続時に検出してエラー表示
+- 同期完了でリモート変更を取り込んだ場合、メモ一覧と表示中メモを自動リフレッシュ(**編集中=dirty のメモは上書きしない**。表示中メモがリモート削除された場合は先頭メモへ遷移)
+- 「同期を解除」でサーバー接続情報とキーを破棄(ローカルのメモは残る)
+
 ## 6. キーボードショートカット一覧
 
 | キー | 動作 |
@@ -214,6 +277,8 @@ CREATE TABLE notes (
 | メモ本体 | `%APPDATA%\zettelkasten-local\zettelkasten.db` | SQLite(WAL モード) |
 | 左パネルの幅・開閉 | localStorage `zk:panel:left` | `{ width: number, collapsed: boolean }` |
 | 右パネルの幅・開閉 | localStorage `zk:panel:right` | `{ width: number, collapsed: boolean }` |
+| 同期設定(Step2) | `%APPDATA%\zettelkasten-local\sync-config.json` | serverUrl / username / セッショントークン / salt / safeStorage 暗号化済みパスフレーズ / lastSyncMs |
+| サーバー側データ(Step2) | Docker volume `zettel-db`(PostgreSQL) | 暗号化済みレコードのみ(平文・鍵は保存されない) |
 
 - 閲覧履歴・タグ絞り込み状態はセッション内のみ(永続化しない)
 
@@ -221,7 +286,9 @@ CREATE TABLE notes (
 
 > 新しく決まった事項・検討中の要件はここに追記する。
 
-- (現在なし)
+- **Step2 実装済み(2026-08-01)**: サーバー同期 + ゼロ知識暗号化(§5.8)。サーバー API は Docker 上で LWW・認証・meta 上書き防止まで検証済み。Electron アプリからの実機同期(2端末想定の突き合わせ)は今後の動作確認項目
+- **ハイブリッド化(2026-08-01)**: 認証を固定トークンから**アカウント制(登録/ログイン + ユーザーごとのデータ分離)**へ変更(§5.8.0 / §5.8.1)。既定はローカルモードで、同期は完全オプトイン。Docker 上で登録・ログイン・二重登録 409・誤パスワード 401・ユーザー間のデータ分離・LWW を検証済み
+- Step2 の既知の割り切り: セッショントークンは無期限(失効・更新なし) / LWW はメモ単位(フィールド単位のマージなし) / 同期はオンライン時のみ(オフラインキューは lastSyncMs カーソルで代替) / サーバーは HTTP 前提(公開時はリバースプロキシで TLS 化を推奨)
 
 ## 9. 変更履歴
 
@@ -231,3 +298,4 @@ CREATE TABLE notes (
 | v0.1.1 | ハッシュタグ機能: 自動認識 / タグパネルと絞り込み / 共通タグの可視化 / キーワードタブのタグ最優先ソート |
 | v0.1.2 | サイドバーのリサイズ・開閉: ドラッグリサイズ / 3系統の開閉トグル / レイアウトの localStorage 永続化 |
 | v0.1.3 | 仕様書の整備: 全機能を `仕様書_claude.md` に書き起こし / update-specs スキルを正規の配置(`.claude/skills/update-specs/`)へ移動 |
+| v0.2.0 | Step2: サーバー同期 + ゼロ知識暗号化。Docker Compose バックエンド(Express + PostgreSQL) / scrypt + AES-256-GCM のクライアントサイド暗号化 / LWW 差分同期 / ハイブリッド設計(既定ローカルモード + アカウント制のオプトイン同期) / 同期パネル UI(秘密情報の表示切替・暗号化キーのプリフィル) |

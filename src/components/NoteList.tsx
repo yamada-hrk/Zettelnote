@@ -6,6 +6,7 @@
 //   クリックでそのタグを含むメモに絞り込む(再クリックで解除)
 // - すりガラス調の半透明パネル + ホバー時の輝線ボーダー(glow-card)
 // ============================================================
+import SyncPanel from './SyncPanel';
 import type { NoteMeta } from '../types';
 
 interface Props {
@@ -178,6 +179,9 @@ export default function NoteList({
           })}
         </ul>
       </nav>
+
+      {/* サーバー同期ステータス + 設定(Step2) */}
+      <SyncPanel />
     </aside>
   );
 }

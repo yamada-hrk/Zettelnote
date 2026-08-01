@@ -43,3 +43,20 @@ export interface RecommendResult {
 
 /** レコメンドのタブ種別 */
 export type RecommendMode = 'vector' | 'keyword';
+
+/** サーバー同期のステータス(メインプロセスから通知される) */
+export interface SyncStatus {
+  /** 同期が設定済みか(サーバー接続情報 + 暗号化キーが揃っている) */
+  configured: boolean;
+  /** 同期処理の実行中か */
+  syncing: boolean;
+  /** 最後に同期が成功した時刻(epoch ms)。未同期なら null */
+  lastSyncAt: number | null;
+  /** 直近のエラーメッセージ。正常なら null */
+  lastError: string | null;
+  serverUrl: string | null;
+  /** ログイン中のアカウント名(ローカルモードなら null) */
+  account: string | null;
+  /** 直近の同期でリモートから取り込んだ件数(完了通知にのみ含まれる) */
+  pulled?: number;
+}

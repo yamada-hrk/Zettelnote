@@ -8,6 +8,7 @@ const path = require('path');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const db = require('./db');
 const search = require('./search');
+const sync = require('./sync');
 const { extractTags } = require('./tags');
 
 /** メインウィンドウの参照(GC防止のため保持) */
@@ -43,8 +44,18 @@ app.whenReady().then(() => {
   // DB ファイルは OS 標準のユーザーデータ領域に保存する
   // (例: C:\Users\<name>\AppData\Roaming\zettelkasten-local\zettelkasten.db)
   db.init(app.getPath('userData'));
+  // 同期エンジン初期化(ステータス変化はレンダラーへプッシュ通知)
+  sync.init(app.getPath('userData'), (status) => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('sync:status', status);
+    }
+  });
   registerIpcHandlers();
   createWindow();
+
+  // 起動直後に一度同期し、以降は60秒ごとの定期同期(未設定なら何もしない)
+  sync.requestSync(3000);
+  setInterval(() => sync.requestSync(0), 60_000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -73,13 +84,25 @@ function registerIpcHandlers() {
   ipcMain.handle('notes:get', (_e, id) => db.getNote(id));
 
   // 新規メモ作成
-  ipcMain.handle('notes:create', () => db.createNote());
+  ipcMain.handle('notes:create', () => {
+    const note = db.createNote();
+    sync.requestSync();
+    return note;
+  });
 
-  // メモ更新(タイトル・本文)
-  ipcMain.handle('notes:update', (_e, id, patch) => db.updateNote(id, patch));
+  // メモ更新(タイトル・本文)。変更はデバウンス付きでサーバーへ同期
+  ipcMain.handle('notes:update', (_e, id, patch) => {
+    const note = db.updateNote(id, patch);
+    sync.requestSync();
+    return note;
+  });
 
-  // メモ削除
-  ipcMain.handle('notes:delete', (_e, id) => db.deleteNote(id));
+  // メモ削除(墓標を残して削除を他端末へ伝搬)
+  ipcMain.handle('notes:delete', (_e, id) => {
+    const result = db.deleteNote(id);
+    sync.requestSync();
+    return result;
+  });
 
   // レコメンド検索(ベクトル一致・キーワード一致の両方を一度に返す)
   ipcMain.handle('notes:recommend', (_e, payload) => {
@@ -109,5 +132,28 @@ function registerIpcHandlers() {
       vector: withSharedTags(search.vectorSearch(text, docs, 10)),
       keyword: search.keywordSearch(text, docs, 10),
     };
+  });
+
+  // ---- サーバー同期(Step2) ----
+
+  // 同期ステータス取得
+  ipcMain.handle('sync:get-status', () => sync.getStatus());
+
+  // 保存済みパスフレーズの復元(設定画面のプリフィル用・ログイン中のみ)
+  ipcMain.handle('sync:get-passphrase', () => sync.getPassphrase());
+
+  // 同期設定(サーバー URL / トークン / 暗号化パスフレーズ)
+  ipcMain.handle('sync:configure', (_e, payload) => sync.configure(payload));
+
+  // 手動同期
+  ipcMain.handle('sync:now', () => {
+    sync.requestSync(0);
+    return true;
+  });
+
+  // 同期解除(ローカルのメモは残る)
+  ipcMain.handle('sync:disable', () => {
+    sync.disable();
+    return true;
   });
 }

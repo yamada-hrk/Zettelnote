@@ -27,4 +27,32 @@ contextBridge.exposeInMainWorld('api', {
    * @returns {{ vector: RecommendItem[], keyword: RecommendItem[] }}
    */
   recommend: (payload) => ipcRenderer.invoke('notes:recommend', payload),
+
+  // ---- サーバー同期(Step2) ----
+
+  /** 同期ステータスを取得 */
+  syncGetStatus: () => ipcRenderer.invoke('sync:get-status'),
+
+  /** 保存済みの暗号化キーを取得(ログイン中のみ。設定画面のプリフィル用) */
+  syncGetPassphrase: () => ipcRenderer.invoke('sync:get-passphrase'),
+
+  /** 同期を設定(payload = { serverUrl, token, passphrase }) */
+  syncConfigure: (payload) => ipcRenderer.invoke('sync:configure', payload),
+
+  /** 今すぐ同期 */
+  syncNow: () => ipcRenderer.invoke('sync:now'),
+
+  /** 同期設定を解除(ローカルのメモは残る) */
+  syncDisable: () => ipcRenderer.invoke('sync:disable'),
+
+  /**
+   * 同期ステータス変化の購読
+   * @param {(status: object) => void} callback
+   * @returns {() => void} 購読解除関数
+   */
+  onSyncStatus: (callback) => {
+    const listener = (_e, status) => callback(status);
+    ipcRenderer.on('sync:status', listener);
+    return () => ipcRenderer.removeListener('sync:status', listener);
+  },
 });

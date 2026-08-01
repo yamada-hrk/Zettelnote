@@ -242,6 +242,44 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleBack, handleForward]);
 
+  // ---- サーバー同期: リモート変更を取り込んだら一覧・表示中メモを最新化 ----
+  useEffect(() => {
+    const unsubscribe = window.api.onSyncStatus((status) => {
+      if (status.syncing || !status.configured || status.lastError) return;
+      if (!status.pulled) return;
+      void (async () => {
+        await refreshList();
+        const cur = latestRef.current.id;
+        if (cur === null || dirtyRef.current) return; // 編集中は上書きしない
+        const note = await window.api.getNote(cur);
+        if (note) {
+          // 表示中メモがリモートで更新されていた場合は内容を差し替える
+          setTitle(note.title);
+          setBody(note.body);
+        } else {
+          // 表示中メモがリモートで削除されていた場合
+          history.remove(cur);
+          const list = await window.api.listNotes();
+          setNotes(list);
+          if (list.length > 0) {
+            const next = await window.api.getNote(list[0].id);
+            if (next) {
+              applyNote(next);
+              history.push(next.id);
+            }
+          } else {
+            setCurrentId(null);
+            setTitle('');
+            setBody('');
+            setSaveState('idle');
+          }
+        }
+      })();
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshList, history.remove, history.push]);
+
   // ---- キーボードショートカット: Ctrl+B 左パネル / Ctrl+Shift+B 右パネル ----
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
