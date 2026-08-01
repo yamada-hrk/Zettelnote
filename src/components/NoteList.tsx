@@ -9,6 +9,8 @@
 import type { NoteMeta } from '../types';
 
 interface Props {
+  /** パネルの幅(px)。リサイズ対応のため親から渡される */
+  width: number;
   /** 表示するメモ(タグ絞り込み適用済み) */
   notes: NoteMeta[];
   /** 全メモのタグ集計: [タグ名, 件数](件数降順) */
@@ -23,6 +25,7 @@ interface Props {
 }
 
 export default function NoteList({
+  width,
   notes,
   tags,
   tagFilter,
@@ -32,7 +35,11 @@ export default function NoteList({
   onSelectTag,
 }: Props) {
   return (
-    <aside className="flex w-64 shrink-0 flex-col border-r border-white/5 bg-white/[0.02] backdrop-blur-xl">
+    // 境界線は PanelHandle 側が描画するため、ここでは border を持たない
+    <aside
+      style={{ width }}
+      className="flex h-full shrink-0 flex-col bg-white/[0.02] backdrop-blur-xl"
+    >
       {/* ヘッダー */}
       <div className="flex items-center justify-between border-b border-white/5 px-4 py-3.5">
         <h1 className="text-sm font-bold tracking-wide text-slate-200">

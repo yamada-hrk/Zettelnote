@@ -21,8 +21,13 @@ interface Props {
   saveState: SaveState;
   canGoBack: boolean;
   canGoForward: boolean;
+  /** 左右サイドバーの開閉状態(ツールバーのアイコン表示用) */
+  leftCollapsed: boolean;
+  rightCollapsed: boolean;
   onBack: () => void;
   onForward: () => void;
+  onToggleLeft: () => void;
+  onToggleRight: () => void;
   onChangeTitle: (v: string) => void;
   onChangeBody: (v: string) => void;
   onDelete: () => void;
@@ -42,6 +47,33 @@ function Divider() {
   return <div className="h-5 w-px shrink-0 bg-white/10" />;
 }
 
+/** サイドバー開閉ボタンのアイコン(開いている側を塗りで示す) */
+function PanelGlyph({ side, open }: { side: 'left' | 'right'; open: boolean }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" className="block">
+      <rect
+        x="1.5"
+        y="2.5"
+        width="13"
+        height="11"
+        rx="2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+      />
+      <rect
+        x={side === 'left' ? 3 : 9}
+        y="4"
+        width="4"
+        height="8"
+        rx="1"
+        fill="currentColor"
+        opacity={open ? 0.85 : 0.25}
+      />
+    </svg>
+  );
+}
+
 export default function Editor({
   noteId,
   title,
@@ -49,8 +81,12 @@ export default function Editor({
   saveState,
   canGoBack,
   canGoForward,
+  leftCollapsed,
+  rightCollapsed,
   onBack,
   onForward,
+  onToggleLeft,
+  onToggleRight,
   onChangeTitle,
   onChangeBody,
   onDelete,
@@ -87,6 +123,18 @@ export default function Editor({
       {/* フローティング・アイランド型ツールバー */}
       <div className="pointer-events-none absolute inset-x-0 top-4 z-20 flex justify-center px-6">
         <div className="pointer-events-auto flex items-center gap-2 rounded-2xl border border-white/10 bg-[#12151f]/70 px-2.5 py-1.5 shadow-2xl shadow-black/50 backdrop-blur-xl">
+          {/* 左サイドバー(メモ一覧)の開閉 */}
+          <button
+            onClick={onToggleLeft}
+            title="メモ一覧を開閉 (Ctrl+B)"
+            aria-label="メモ一覧サイドバーを開閉"
+            className="rounded-lg px-2 py-1.5 text-slate-400 transition-all duration-150 hover:bg-white/10 hover:text-slate-100"
+          >
+            <PanelGlyph side="left" open={!leftCollapsed} />
+          </button>
+
+          <Divider />
+
           {/* 戻る / 進む(閲覧履歴のナビゲーション) */}
           <div className="flex gap-0.5">
             <button
@@ -153,6 +201,18 @@ export default function Editor({
             title="このメモを削除"
           >
             🗑 削除
+          </button>
+
+          <Divider />
+
+          {/* 右サイドバー(関連メモ)の開閉 */}
+          <button
+            onClick={onToggleRight}
+            title="関連メモを開閉 (Ctrl+Shift+B)"
+            aria-label="関連メモサイドバーを開閉"
+            className="rounded-lg px-2 py-1.5 text-slate-400 transition-all duration-150 hover:bg-white/10 hover:text-slate-100"
+          >
+            <PanelGlyph side="right" open={!rightCollapsed} />
           </button>
         </div>
       </div>

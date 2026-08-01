@@ -8,8 +8,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NoteList from './components/NoteList';
 import Editor from './components/Editor';
 import RecommendSidebar from './components/RecommendSidebar';
+import PanelHandle from './components/PanelHandle';
 import { useDebounce } from './hooks/useDebounce';
 import { useNoteHistory } from './hooks/useNoteHistory';
+import { useResizablePanel } from './hooks/useResizablePanel';
 import type { Note, NoteMeta, RecommendResult } from './types';
 
 /** 保存状態の表示用 */
@@ -32,6 +34,22 @@ export default function App() {
 
   // ---- 閲覧履歴(戻る / 進む) ----
   const history = useNoteHistory();
+
+  // ---- サイドバーのリサイズ・開閉(localStorage に永続化) ----
+  const leftPanel = useResizablePanel({
+    storageKey: 'zk:panel:left',
+    defaultWidth: 256,
+    minWidth: 200,
+    maxWidth: 400,
+    side: 'left',
+  });
+  const rightPanel = useResizablePanel({
+    storageKey: 'zk:panel:right',
+    defaultWidth: 320,
+    minWidth: 240,
+    maxWidth: 480,
+    side: 'right',
+  });
 
   // ---- ハッシュタグ絞り込み ----
   const [tagFilter, setTagFilter] = useState<string | null>(null);
@@ -224,6 +242,22 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleBack, handleForward]);
 
+  // ---- キーボードショートカット: Ctrl+B 左パネル / Ctrl+Shift+B 右パネル ----
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key.toLowerCase() !== 'b') return;
+      e.preventDefault();
+      if (e.shiftKey) {
+        rightPanel.toggle();
+      } else {
+        leftPanel.toggle();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [leftPanel.toggle, rightPanel.toggle]);
+
   /** 現在のメモを削除する */
   const handleDelete = useCallback(async () => {
     if (currentId === null) return;
@@ -264,15 +298,39 @@ export default function App() {
   return (
     // 背景色は body 側(index.css)のダークグラデーションに任せる
     <div className="flex h-full text-slate-300">
-      {/* 左: メモ一覧 + タグパネル */}
-      <NoteList
-        notes={visibleNotes}
-        tags={tagCounts}
-        tagFilter={tagFilter}
-        currentId={currentId}
-        onSelect={handleSelect}
-        onCreate={handleCreate}
-        onSelectTag={handleSelectTag}
+      {/* 左: メモ一覧 + タグパネル
+          外側ラッパーの width をアニメーションさせて開閉し、
+          内側は固定幅を保つことで折りたたみ中も内容が潰れない */}
+      <div
+        className="flex shrink-0 justify-end overflow-hidden"
+        style={{
+          width: leftPanel.collapsed ? 0 : leftPanel.width,
+          transition: leftPanel.resizing
+            ? 'none'
+            : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <NoteList
+          width={leftPanel.width}
+          notes={visibleNotes}
+          tags={tagCounts}
+          tagFilter={tagFilter}
+          currentId={currentId}
+          onSelect={handleSelect}
+          onCreate={handleCreate}
+          onSelectTag={handleSelectTag}
+        />
+      </div>
+
+      {/* 左パネルの境界線(ドラッグリサイズ + 開閉トグル) */}
+      <PanelHandle
+        side="left"
+        collapsed={leftPanel.collapsed}
+        resizing={leftPanel.resizing}
+        onResizeStart={leftPanel.startResize}
+        onToggle={leftPanel.toggle}
+        onResetWidth={leftPanel.resetWidth}
+        shortcutHint="Ctrl+B"
       />
 
       {/* 中央: エディタ */}
@@ -283,20 +341,46 @@ export default function App() {
         saveState={saveState}
         canGoBack={history.canGoBack}
         canGoForward={history.canGoForward}
+        leftCollapsed={leftPanel.collapsed}
+        rightCollapsed={rightPanel.collapsed}
         onBack={handleBack}
         onForward={handleForward}
+        onToggleLeft={leftPanel.toggle}
+        onToggleRight={rightPanel.toggle}
         onChangeTitle={handleChangeTitle}
         onChangeBody={handleChangeBody}
         onDelete={handleDelete}
         onCreate={handleCreate}
       />
 
-      {/* 右: リアルタイム・レコメンドサイドバー */}
-      <RecommendSidebar
-        result={recommend}
-        searching={searching}
-        onOpen={handleSelect}
+      {/* 右パネルの境界線(ドラッグリサイズ + 開閉トグル) */}
+      <PanelHandle
+        side="right"
+        collapsed={rightPanel.collapsed}
+        resizing={rightPanel.resizing}
+        onResizeStart={rightPanel.startResize}
+        onToggle={rightPanel.toggle}
+        onResetWidth={rightPanel.resetWidth}
+        shortcutHint="Ctrl+Shift+B"
       />
+
+      {/* 右: リアルタイム・レコメンドサイドバー */}
+      <div
+        className="flex shrink-0 overflow-hidden"
+        style={{
+          width: rightPanel.collapsed ? 0 : rightPanel.width,
+          transition: rightPanel.resizing
+            ? 'none'
+            : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+        }}
+      >
+        <RecommendSidebar
+          width={rightPanel.width}
+          result={recommend}
+          searching={searching}
+          onOpen={handleSelect}
+        />
+      </div>
     </div>
   );
 }

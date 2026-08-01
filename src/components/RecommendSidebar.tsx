@@ -29,17 +29,28 @@ import type { CSSProperties } from 'react';
 import type { RecommendItem, RecommendMode, RecommendResult } from '../types';
 
 interface Props {
+  /** パネルの幅(px)。リサイズ対応のため親から渡される */
+  width: number;
   result: RecommendResult;
   searching: boolean;
   onOpen: (id: number) => void;
 }
 
-export default function RecommendSidebar({ result, searching, onOpen }: Props) {
+export default function RecommendSidebar({
+  width,
+  result,
+  searching,
+  onOpen,
+}: Props) {
   const [mode, setMode] = useState<RecommendMode>('vector');
   const items = mode === 'vector' ? result.vector : result.keyword;
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-white/5 bg-white/[0.02] backdrop-blur-xl">
+    // 境界線は PanelHandle 側が描画するため、ここでは border を持たない
+    <aside
+      style={{ width }}
+      className="flex h-full shrink-0 flex-col bg-white/[0.02] backdrop-blur-xl"
+    >
       {/* ヘッダー */}
       <div className="border-b border-white/5 px-4 py-3.5">
         <div className="flex items-center gap-2">
