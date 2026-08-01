@@ -14,8 +14,17 @@
 //   - ホバー時に scale(1.03) で滑らかに拡大 + glow-card の輝線ボーダー
 //   - 出現時は rise-in で順位に応じたスタッガー(時間差)アニメーション
 //   サイドバーに左右パディングを確保してあるため、拡大しても枠を越境しない。
+//
+// ■ ハッシュタグによる繋がりの可視化
+//   編集中メモと共通のタグ(sharedTags)を持つ候補には、バイオレットの
+//   「#タグ」チップを表示する(キーワード一致のインディゴチップと色で区別)
+//
+// ■ キーワードタブの優先度(バックエンドのソートと対応)
+//   第1優先: ハッシュタグが一致するメモ / 第2優先: キーワードのみ一致
+//   の順で並ぶため、境界に「# タグ一致」「キーワード一致」の小見出しを
+//   挿入し、タグ一致カードには薄いバイオレットの枠でさりげなく差をつける
 // ============================================================
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { CSSProperties } from 'react';
 import type { RecommendItem, RecommendMode, RecommendResult } from '../types';
 
@@ -66,19 +75,62 @@ export default function RecommendSidebar({ result, searching, onOpen }: Props) {
           </p>
         ) : (
           <ul className="space-y-1.5">
-            {items.map((item, rank) => (
-              <RecommendCard
-                key={`${mode}-${item.id}`}
-                item={item}
-                rank={rank}
-                mode={mode}
-                onOpen={onOpen}
-              />
-            ))}
+            {items.map((item, rank) => {
+              // キーワードタブ: タグ一致組と一般キーワード組の境界に小見出しを挿入
+              // (バックエンドがタグ一致を最優先でソート済みであることが前提)
+              const tagMatched = (item.sharedTags?.length ?? 0) > 0;
+              const showTagHeader =
+                mode === 'keyword' && rank === 0 && tagMatched;
+              const showPlainHeader =
+                mode === 'keyword' &&
+                !tagMatched &&
+                rank > 0 &&
+                (items[rank - 1].sharedTags?.length ?? 0) > 0;
+              return (
+                <Fragment key={`${mode}-${item.id}`}>
+                  {showTagHeader && (
+                    <GroupHeader label="# タグ一致" tone="violet" />
+                  )}
+                  {showPlainHeader && <GroupHeader label="キーワード一致" />}
+                  <RecommendCard
+                    item={item}
+                    rank={rank}
+                    mode={mode}
+                    onOpen={onOpen}
+                  />
+                </Fragment>
+              );
+            })}
           </ul>
         )}
       </div>
     </aside>
+  );
+}
+
+// ------------------------------------------------------------
+// グループ小見出し(キーワードタブの優先度の区切り)
+// ------------------------------------------------------------
+function GroupHeader({
+  label,
+  tone = 'slate',
+}: {
+  label: string;
+  tone?: 'violet' | 'slate';
+}) {
+  return (
+    <li
+      className={`flex items-center gap-2 px-1 pt-1 text-[10px] font-semibold uppercase tracking-wider ${
+        tone === 'violet' ? 'text-violet-300/80' : 'text-slate-500'
+      }`}
+    >
+      {label}
+      <span
+        className={`h-px flex-1 ${
+          tone === 'violet' ? 'bg-violet-400/20' : 'bg-white/10'
+        }`}
+      />
+    </li>
   );
 }
 
@@ -132,6 +184,15 @@ function RecommendCard({
   const hoverFx =
     'glow-card transition-all duration-200 ease-out hover:scale-[1.03] hover:bg-white/[0.06] hover:shadow-xl hover:shadow-indigo-950/60 hover:z-10';
 
+  // キーワードタブでタグ一致したカードは薄いバイオレットの枠で区別する
+  const tagMatched = mode === 'keyword' && (item.sharedTags?.length ?? 0) > 0;
+  const tier0Frame = tagMatched
+    ? 'bg-violet-500/[0.05] ring-1 ring-violet-400/25'
+    : 'bg-white/[0.04] ring-1 ring-white/[0.07]';
+  const tier1Frame = tagMatched
+    ? 'bg-violet-500/[0.03] ring-1 ring-violet-400/20'
+    : 'bg-white/[0.02] ring-1 ring-white/[0.05]';
+
   // 順位に応じた時間差で下からふわっと出現させる
   const riseStyle: CSSProperties = {
     '--rise-opacity': opacity,
@@ -144,7 +205,7 @@ function RecommendCard({
       {tier === 0 && (
         <button
           onClick={() => onOpen(item.id)}
-          className={`group w-full rounded-xl bg-white/[0.04] p-3 text-left ring-1 ring-white/[0.07] ${hoverFx}`}
+          className={`group w-full rounded-xl p-3 text-left ${tier0Frame} ${hoverFx}`}
         >
           <div className="flex items-start gap-2">
             <RankBadge rank={rank} />
@@ -157,18 +218,13 @@ function RecommendCard({
               {item.excerpt}
             </p>
           )}
-          {/* キーワード一致タブでは一致語をチップ表示 */}
-          {mode === 'keyword' && item.matchedTerms && item.matchedTerms.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">
-              {item.matchedTerms.map((t) => (
-                <span
-                  key={t}
-                  className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+          {/* 編集中メモと共通のタグ(バイオレット) + キーワード一致語(インディゴ) */}
+          <SharedTagChips tags={item.sharedTags} />
+          {mode === 'keyword' && (
+            <MatchedTermChips
+              terms={item.matchedTerms}
+              sharedTags={item.sharedTags}
+            />
           )}
           <ScoreBar score={item.score} />
         </button>
@@ -178,7 +234,7 @@ function RecommendCard({
       {tier === 1 && (
         <button
           onClick={() => onOpen(item.id)}
-          className={`group w-full rounded-xl bg-white/[0.02] px-3 py-2 text-left ring-1 ring-white/[0.05] ${hoverFx}`}
+          className={`group w-full rounded-xl px-3 py-2 text-left ${tier1Frame} ${hoverFx}`}
         >
           <div className="flex items-center gap-2">
             <RankBadge rank={rank} />
@@ -191,6 +247,7 @@ function RecommendCard({
               {item.excerpt}
             </p>
           )}
+          <SharedTagChips tags={item.sharedTags} small />
         </button>
       )}
 
@@ -207,6 +264,16 @@ function RecommendCard({
             <span className="min-w-0 flex-1 truncate text-xs text-slate-400 transition-colors group-hover:text-indigo-300">
               {item.title}
             </span>
+            {/* タグの繋がりだけは最小表示でも示す */}
+            {item.sharedTags && item.sharedTags.length > 0 && (
+              <span
+                title={item.sharedTags.map((t) => `#${t}`).join(' ')}
+                className="shrink-0 rounded-full bg-violet-500/15 px-1.5 text-[9px] text-violet-300"
+              >
+                #{item.sharedTags[0]}
+                {item.sharedTags.length > 1 && ` +${item.sharedTags.length - 1}`}
+              </span>
+            )}
           </div>
           {/* ホバー時のみ抜粋がスライド表示されるマイクロインタラクション */}
           {item.excerpt && (
@@ -217,6 +284,62 @@ function RecommendCard({
         </button>
       )}
     </li>
+  );
+}
+
+/**
+ * 編集中メモと共通のハッシュタグチップ(バイオレット)
+ * 「同じタグを持つメモ」であることをひと目で示す
+ */
+function SharedTagChips({
+  tags,
+  small = false,
+}: {
+  tags?: string[];
+  small?: boolean;
+}) {
+  if (!tags || tags.length === 0) return null;
+  return (
+    <div className={`flex flex-wrap gap-1 ${small ? 'mt-1 pl-7' : 'mt-1.5'}`}>
+      {tags.map((t) => (
+        <span
+          key={t}
+          title="編集中のメモと同じタグ"
+          className={`rounded-full bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/25 ${
+            small ? 'px-1.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'
+          }`}
+        >
+          #{t}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * キーワード一致語チップ(インディゴ)
+ * 共通タグとして表示済みの語は重複表示しない
+ */
+function MatchedTermChips({
+  terms,
+  sharedTags,
+}: {
+  terms?: string[];
+  sharedTags?: string[];
+}) {
+  const rest = (terms || []).filter((t) => !(sharedTags || []).includes(t));
+  if (rest.length === 0) return null;
+  return (
+    <div className="mt-1.5 flex flex-wrap gap-1">
+      {rest.map((t) => (
+        <span
+          key={t}
+          className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
+        >
+          {t}
+        </span>
+      ))}
+    </div>
   );
 }
 

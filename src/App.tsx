@@ -4,7 +4,7 @@
 // - 自動保存: 入力停止 800ms 後に SQLite へ保存
 // - レコメンド: 入力停止 600ms 後にバックグラウンドで類似検索
 // ============================================================
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NoteList from './components/NoteList';
 import Editor from './components/Editor';
 import RecommendSidebar from './components/RecommendSidebar';
@@ -32,6 +32,38 @@ export default function App() {
 
   // ---- 閲覧履歴(戻る / 進む) ----
   const history = useNoteHistory();
+
+  // ---- ハッシュタグ絞り込み ----
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
+
+  /** 全メモのタグ集計: [タグ名, 件数] を件数降順(同数は名前順)で返す */
+  const tagCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const n of notes) {
+      for (const t of n.tags) map.set(t, (map.get(t) || 0) + 1);
+    }
+    return [...map.entries()].sort(
+      (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja')
+    );
+  }, [notes]);
+
+  /** タグ絞り込み後の一覧(未選択なら全件) */
+  const visibleNotes = useMemo(
+    () => (tagFilter ? notes.filter((n) => n.tags.includes(tagFilter)) : notes),
+    [notes, tagFilter]
+  );
+
+  /** タグの選択/解除(同じタグを再クリックで解除) */
+  const handleSelectTag = useCallback((tag: string | null) => {
+    setTagFilter((cur) => (tag === null || cur === tag ? null : tag));
+  }, []);
+
+  // 絞り込み中のタグがどのメモからも消えたら自動解除する
+  useEffect(() => {
+    if (tagFilter && !notes.some((n) => n.tags.includes(tagFilter))) {
+      setTagFilter(null);
+    }
+  }, [notes, tagFilter]);
 
   // ユーザーが編集したかどうか(選択切替時の誤保存を防ぐ)
   const dirtyRef = useRef(false);
@@ -232,12 +264,15 @@ export default function App() {
   return (
     // 背景色は body 側(index.css)のダークグラデーションに任せる
     <div className="flex h-full text-slate-300">
-      {/* 左: メモ一覧 */}
+      {/* 左: メモ一覧 + タグパネル */}
       <NoteList
-        notes={notes}
+        notes={visibleNotes}
+        tags={tagCounts}
+        tagFilter={tagFilter}
         currentId={currentId}
         onSelect={handleSelect}
         onCreate={handleCreate}
+        onSelectTag={handleSelectTag}
       />
 
       {/* 中央: エディタ */}

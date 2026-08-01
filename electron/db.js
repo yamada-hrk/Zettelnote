@@ -31,19 +31,17 @@ function init(userDataDir) {
   `);
 }
 
-/** メモ一覧(本文を含まないメタ情報)を更新日時の降順で返す */
-function listNotes() {
+/**
+ * 全メモを本文込みで更新日時の降順で返す
+ * (一覧のメタ情報整形・タグ抽出・検索の共通ソース)
+ */
+function listNotesWithBody() {
   return db
     .prepare(
-      `SELECT id, title, updated_at, substr(body, 1, 60) AS preview
+      `SELECT id, title, body, updated_at
        FROM notes ORDER BY updated_at DESC, id DESC`
     )
     .all();
-}
-
-/** 検索用: 全メモを本文込みで返す */
-function listNotesWithBody() {
-  return db.prepare(`SELECT id, title, body FROM notes`).all();
 }
 
 /** メモを1件取得 */
@@ -83,7 +81,6 @@ function deleteNote(id) {
 
 module.exports = {
   init,
-  listNotes,
   listNotesWithBody,
   getNote,
   createNote,

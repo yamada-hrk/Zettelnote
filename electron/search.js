@@ -7,10 +7,14 @@
 //   ※ ステップ2以降で、ローカル埋め込みモデル(例: multilingual-e5-small 等)に
 //     差し替える場合も、vectorSearch() の中身を置き換えるだけで済む構造。
 //
-// ■ キーワード検索(単語一致)
+// ■ キーワード検索(ハッシュタグ最優先 + 単語一致)
 //   編集中テキストから特徴語(英単語・カタカナ語・漢字語)を抽出し、
 //   他メモへの出現頻度と位置(タイトル/本文)で採点する。
+//   さらにハッシュタグ(#タグ名)の一致を最優先とする合成スコアで並べる:
+//     第1優先 … 同じハッシュタグを持つメモ(一致タグ数が多いほど上位)
+//     第2優先 … 一般キーワードのみ一致するメモ
 // ============================================================
+const { extractTags } = require('./tags');
 
 // ------------------------------------------------------------
 // 共通ユーティリティ
@@ -145,17 +149,25 @@ function extractTerms(text, maxTerms = 15) {
 }
 
 /**
- * キーワード検索本体
- * @returns {{id:number,title:string,excerpt:string,score:number,matchedTerms:string[]}[]}
+ * キーワード検索本体(ハッシュタグ一致を最優先してソートする)
+ *
+ * ハッシュタグのパース結果と特徴語抽出を組み合わせた合成スコアで採点する:
+ *   合成スコア = 一致タグ数 × (キーワード最高点 + 1) + キーワード点
+ * 「タグ1件の一致 > どんなキーワード一致よりも強い」と定義することで、
+ * タグ一致メモが必ずキーワードのみのメモより上位に並ぶ。
+ * タグさえ一致していればキーワードが一つも一致しないメモも候補に含める。
+ *
+ * @returns {{id:number,title:string,excerpt:string,score:number,matchedTerms:string[],sharedTags:string[]}[]}
  */
 function keywordSearch(queryText, docs, topK) {
   const terms = extractTerms(queryText);
-  if (terms.length === 0) return [];
+  const queryTags = extractTags(queryText);
+  if (terms.length === 0 && queryTags.length === 0) return [];
 
   const scored = docs.map((d) => {
     const title = normalize(d.title);
     const body = normalize(stripMarkdown(d.body));
-    let score = 0;
+    let raw = 0;
     const matchedTerms = [];
     let firstMatchTerm = null;
 
@@ -164,27 +176,42 @@ function keywordSearch(queryText, docs, topK) {
       const inTitle = countOccurrences(title, term);
       const inBody = countOccurrences(body, term);
       if (inTitle + inBody > 0) {
-        score += weight * (inTitle * 3 + Math.min(inBody, 5));
+        raw += weight * (inTitle * 3 + Math.min(inBody, 5));
         matchedTerms.push(term);
         if (!firstMatchTerm && inBody > 0) firstMatchTerm = term;
       }
     }
 
+    // 編集中テキストと共通のハッシュタグ(第1優先の判定材料)
+    const docTags = extractTags(`${d.title}\n${d.body}`);
+    const sharedTags = queryTags.filter((t) => docTags.includes(t));
+
     return {
       id: d.id,
       title: d.title || '(無題)',
       excerpt: makeExcerpt(d.body, firstMatchTerm),
-      score,
+      raw,
       matchedTerms: matchedTerms.slice(0, 5),
+      sharedTags,
     };
   });
 
-  const max = Math.max(...scored.map((s) => s.score), 1);
-  return scored
-    .filter((s) => s.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
-    .map((s) => ({ ...s, score: s.score / max })); // 0〜1 に正規化
+  // タグ1件の重み = キーワード満点 + 1(タグ一致を常に上へ)
+  const maxRaw = Math.max(...scored.map((s) => s.raw), 1);
+  const tagWeight = maxRaw + 1;
+
+  const ranked = scored
+    .map((s) => ({ ...s, combined: s.sharedTags.length * tagWeight + s.raw }))
+    .filter((s) => s.combined > 0)
+    .sort((a, b) => b.combined - a.combined)
+    .slice(0, topK);
+
+  // 合成スコアを 0〜1 に正規化(スコアバー表示も順位と整合する)
+  const maxCombined = Math.max(...ranked.map((s) => s.combined), 1);
+  return ranked.map(({ raw, combined, ...s }) => ({
+    ...s,
+    score: combined / maxCombined,
+  }));
 }
 
 /** 部分文字列の出現回数を数える */

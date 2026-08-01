@@ -9,6 +9,8 @@ export interface NoteMeta {
   updated_at: string;
   /** 本文の先頭抜粋(一覧表示用) */
   preview: string;
+  /** 本文から抽出されたハッシュタグ(正規化済み・出現順) */
+  tags: string[];
 }
 
 /** メモ本体 */
@@ -29,6 +31,8 @@ export interface RecommendItem {
   score: number;
   /** キーワード検索時のみ: 一致した語 */
   matchedTerms?: string[];
+  /** 編集中メモと共通のハッシュタグ(タグによる繋がりの可視化用) */
+  sharedTags?: string[];
 }
 
 /** レコメンド検索の結果(両タブ分) */

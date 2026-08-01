@@ -8,6 +8,7 @@ const path = require('path');
 const { app, BrowserWindow, ipcMain } = require('electron');
 const db = require('./db');
 const search = require('./search');
+const { extractTags } = require('./tags');
 
 /** メインウィンドウの参照(GC防止のため保持) */
 let mainWindow = null;
@@ -59,8 +60,14 @@ app.on('window-all-closed', () => {
 // IPC ハンドラ登録
 // ------------------------------------------------------------
 function registerIpcHandlers() {
-  // メモ一覧(メタ情報のみ)
-  ipcMain.handle('notes:list', () => db.listNotes());
+  // メモ一覧(メタ情報 + 本文から抽出したハッシュタグ)
+  ipcMain.handle('notes:list', () =>
+    db.listNotesWithBody().map(({ body, ...meta }) => ({
+      ...meta,
+      preview: body.slice(0, 60),
+      tags: extractTags(body),
+    }))
+  );
 
   // メモ1件取得
   ipcMain.handle('notes:get', (_e, id) => db.getNote(id));
@@ -86,8 +93,20 @@ function registerIpcHandlers() {
       .listNotesWithBody()
       .filter((n) => n.id !== excludeId);
 
+    // ベクトル検索結果には編集中テキストと共通のハッシュタグを付与する
+    // (キーワード検索はタグ優先ソートのため search.js 内部で算出済み)
+    const queryTags = extractTags(text);
+    const tagsById = new Map(docs.map((d) => [d.id, extractTags(d.body)]));
+    const withSharedTags = (items) =>
+      items.map((item) => ({
+        ...item,
+        sharedTags: queryTags.filter((t) =>
+          (tagsById.get(item.id) || []).includes(t)
+        ),
+      }));
+
     return {
-      vector: search.vectorSearch(text, docs, 10),
+      vector: withSharedTags(search.vectorSearch(text, docs, 10)),
       keyword: search.keywordSearch(text, docs, 10),
     };
   });
