@@ -1,0 +1,143 @@
+@import "tailwindcss";
+
+/* ============================================================
+   全体スタイル(ダークテーマ基調)
+   - ベース色: 純黒ではなく深いダークネイビー #0b0d14
+   - 背景にインディゴ/バイオレットの淡い環境光(radial-gradient)を
+     敷き、半透明パネルから微かに透けて見えるようにする
+   ============================================================ */
+:root {
+  color-scheme: dark;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  font-family: "Segoe UI", "Hiragino Kaku Gothic ProN", "Yu Gothic UI",
+    "Noto Sans JP", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  color: rgb(203 213 225); /* slate-300 */
+  background:
+    radial-gradient(1100px 700px at 85% -10%, rgb(99 102 241 / 0.09), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgb(168 85 247 / 0.06), transparent 60%),
+    #0b0d14;
+  background-attachment: fixed;
+}
+
+/* テキスト選択色もテーマに合わせる */
+::selection {
+  background: rgb(99 102 241 / 0.35);
+}
+
+/* 細めのスクロールバー(ダーク用) */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgb(255 255 255 / 0.08);
+  border-radius: 3px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgb(255 255 255 / 0.16);
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* ============================================================
+   光のグラデーションボーダー(ホバー時に 1px の輝線が浮かぶ)
+   - padding 1px の擬似要素にグラデーションを敷き、mask の
+     content-box 合成で「枠線部分だけ」を残すテクニック
+   ============================================================ */
+.glow-card {
+  position: relative;
+}
+.glow-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgb(129 140 248 / 0.7),
+    rgb(192 132 252 / 0.25) 45%,
+    transparent 75%
+  );
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.glow-card:hover::before {
+  opacity: 1;
+}
+
+/* ============================================================
+   出現アニメーション(レコメンドカード用)
+   - --rise-opacity で「順位が下がるほど淡い」最終透明度を指定できる
+   ============================================================ */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: var(--rise-opacity, 1);
+    transform: translateY(0);
+  }
+}
+.rise-in {
+  animation: rise-in 0.35s ease-out both;
+}
+
+/* ============================================================
+   Markdown プレビューの見た目(ダーク・タイポグラフィ)
+   ============================================================ */
+.markdown-body {
+  line-height: 1.8;
+  color: rgb(203 213 225); /* slate-300 */
+}
+.markdown-body h1 { font-size: 1.5rem; font-weight: 700; margin: 1.2em 0 0.5em; border-bottom: 1px solid rgb(255 255 255 / 0.08); padding-bottom: 0.3em; color: rgb(241 245 249); }
+.markdown-body h2 { font-size: 1.25rem; font-weight: 700; margin: 1.2em 0 0.5em; color: rgb(241 245 249); }
+.markdown-body h3 { font-size: 1.1rem; font-weight: 600; margin: 1em 0 0.4em; color: rgb(226 232 240); }
+.markdown-body p  { margin: 0.6em 0; }
+.markdown-body ul, .markdown-body ol { margin: 0.6em 0; padding-left: 1.6em; }
+.markdown-body ul { list-style: disc; }
+.markdown-body ol { list-style: decimal; }
+.markdown-body li { margin: 0.2em 0; }
+.markdown-body blockquote {
+  border-left: 3px solid rgb(99 102 241 / 0.5); /* indigo の輝線 */
+  padding-left: 1em;
+  color: rgb(148 163 184);
+  margin: 0.8em 0;
+}
+.markdown-body code {
+  background: rgb(255 255 255 / 0.08);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.9em;
+  font-family: Consolas, "Courier New", monospace;
+  color: rgb(199 210 254); /* indigo-200 */
+}
+.markdown-body pre {
+  background: rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  color: rgb(226 232 240);
+  border-radius: 10px;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.markdown-body a { color: rgb(129 140 248); text-decoration: underline; }
+.markdown-body hr { border: none; border-top: 1px solid rgb(255 255 255 / 0.08); margin: 1.5em 0; }
