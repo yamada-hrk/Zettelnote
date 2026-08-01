@@ -1,0 +1,66 @@
+# ============================================================
+# リリースワークフロー
+# - トリガー: v*.*.* 形式のタグ push(例: v0.2.1)
+# - windows-latest で Electron アプリをビルドし、
+#   NSIS インストーラーを GitHub Releases に自動添付する
+# - 将来 macOS / Linux を追加する場合は matrix.include に
+#   コメントアウト済みのエントリを有効化するだけでよい
+# ============================================================
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+# GitHub Releases への書き込みに必要
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            args: --win
+          # 将来 macOS を追加する場合(要コード署名の検討):
+          # - os: macos-latest
+          #   args: --mac
+          # 将来 Linux を追加する場合:
+          # - os: ubuntu-latest
+          #   args: --linux
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: リポジトリを取得
+        uses: actions/checkout@v4
+
+      - name: Node.js をセットアップ
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 依存関係をインストール
+        run: npm ci
+
+      - name: レンダラーをビルド (Vite)
+        run: npm run build
+
+      - name: アプリをパッケージング (electron-builder)
+        run: npx electron-builder ${{ matrix.args }} --publish never
+
+      - name: GitHub Releases へアップロード
+        uses: softprops/action-gh-release@v2
+        with:
+          # タグ名がそのままリリース名になる。本文はコミット履歴から自動生成
+          generate_release_notes: true
+          files: |
+            release/*.exe
+            release/*.blockmap
+            release/latest*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

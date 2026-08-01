@@ -58,6 +58,19 @@ npm run dev
 
 # 本番ビルドして起動
 npm start
+
+# Windows インストーラーを生成(release/ に出力。dev サーバー停止中に実行)
+npm run dist
+```
+
+### リリース(GitHub Actions)
+
+`v*.*.*` 形式のタグを push すると、GitHub Actions が Windows インストーラーをビルドして
+GitHub Releases に自動添付します(`.github/workflows/release.yml`)。追加のシークレット設定は不要です。
+
+```powershell
+git tag -a v0.3.0 -m "リリース内容"
+git push origin v0.3.0
 ```
 
 DB ファイルは `%APPDATA%\zettelkasten-local\zettelkasten.db` に保存されます。

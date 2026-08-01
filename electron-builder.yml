@@ -1,0 +1,44 @@
+# ============================================================
+# electron-builder 設定(デスクトップアプリのパッケージング)
+# - Windows: NSIS インストーラーを生成
+# - 将来 mac / linux ターゲットを追加する場合はこのファイルに
+#   mac: / linux: セクションを足すだけでよい
+# ============================================================
+appId: com.yamada-hrk.zettelnote
+productName: ZettelNote
+
+directories:
+  output: release
+
+# パッケージに含めるファイル(レンダラーは事前に vite build しておくこと)
+files:
+  - dist/**
+  - electron/**
+  - package.json
+
+# ネイティブモジュールの再ビルドは行わない:
+# better-sqlite3 はプリビルドバイナリで Electron 動作確認済みのため
+# (再ビルドには Visual Studio Build Tools が必要になり、環境要求が増える)
+npmRebuild: false
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+
+nsis:
+  # ワンクリックではなく、インストール先を選べる標準的なインストーラーにする
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+# 将来の macOS 向け(コード署名が必要になったら identity 等を設定)
+# mac:
+#   target: [dmg, zip]
+#   category: public.app-category.productivity
+
+# 将来の Linux 向け
+# linux:
+#   target: [AppImage]
+#   category: Office

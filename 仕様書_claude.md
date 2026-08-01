@@ -1,6 +1,6 @@
 # ローカル・ツェッテルカステン 仕様書
 
-- 対象バージョン: **v0.2.1**
+- 対象バージョン: **v0.2.2**
 - 最終更新日: 2026-08-01
 - 本書はアプリの全機能仕様を記述する正本である。追加要件・変更は本書の構造を保ったまま該当セクション(または「Active Context」)に追記すること。
 
@@ -305,3 +305,26 @@ CREATE TABLE sync_notes (uid TEXT PRIMARY KEY, payload TEXT, iv TEXT,           
 | v0.1.3 | 仕様書の整備: 全機能を `仕様書_claude.md` に書き起こし / update-specs スキルを正規の配置(`.claude/skills/update-specs/`)へ移動 |
 | v0.2.0 | Step2: サーバー同期 + ゼロ知識暗号化。Docker Compose バックエンド(Express + PostgreSQL) / scrypt + AES-256-GCM のクライアントサイド暗号化 / LWW 差分同期 / ハイブリッド設計(既定ローカルモード + アカウント制のオプトイン同期) / 同期パネル UI(秘密情報の表示切替・暗号化キーのプリフィル) |
 | v0.2.1 | セキュリティ強化: 認証エンドポイントにレートリミット(IP 単位・15分に失敗10回まで) / データ系 API に 1分120回の上限(express-rate-limit) |
+| v0.2.2 | リリース自動化: electron-builder による NSIS インストーラー生成(`npm run dist`) / GitHub Actions で `v*.*.*` タグ push 時に Windows ビルド + GitHub Releases 自動添付(§10) |
+
+## 10. ビルド・リリース(CI/CD)
+
+### パッケージング(electron-builder)
+- 設定: `electron-builder.yml`。Windows は **NSIS インストーラー**(x64、インストール先選択可)を生成
+- 成果物名: `ZettelNote-Setup-<version>.exe`(出力先 `release/`、git 管理外)
+- ローカル実行: `npm run dist`(`vite build` → `electron-builder`)
+  - 注意: `npm run dev` の起動中はファイルウォッチャーが `release/` を掴み EPERM で失敗するため、開発サーバーを止めてから実行する
+- `npmRebuild: false`: better-sqlite3 はプリビルドバイナリで Electron 動作確認済みのため再ビルドしない(Visual Studio Build Tools 不要)
+- 未署名のため、初回起動時に Windows SmartScreen の警告が出る(公開配布するならコード署名証明書の導入を検討)
+
+### GitHub Actions(`.github/workflows/release.yml`)
+- **トリガー**: `v*.*.*` 形式のタグ push(例: `v0.3.0`)
+- **ジョブ**: `windows-latest` 上で `npm ci` → `vite build` → `electron-builder --win`
+- **リリース**: softprops/action-gh-release がタグ名でリリースを作成し、
+  `release/*.exe` / `*.blockmap` / `latest*.yml` をアセットとして添付(リリースノートはコミット履歴から自動生成)
+- 認証はリポジトリ標準の `GITHUB_TOKEN`(`permissions: contents: write`)のみ。**追加のシークレット設定は不要**
+- **将来の Mac/Linux 追加**: matrix にコメントアウト済みのエントリ(macos-latest / ubuntu-latest)を有効化し、`electron-builder.yml` に mac / linux セクションを追加するだけでよい
+
+### 注意: インストール版のデータ保存先
+- パッケージ版は productName が `ZettelNote` のため、ユーザーデータは `%APPDATA%\ZettelNote\` に保存される
+- 開発時(`npm run dev`)の `%APPDATA%\zettelkasten-local\` とは**別の場所**になる(インストール版は空の状態から始まる)
