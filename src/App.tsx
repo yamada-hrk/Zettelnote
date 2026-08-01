@@ -9,6 +9,7 @@ import NoteList from './components/NoteList';
 import Editor from './components/Editor';
 import RecommendSidebar from './components/RecommendSidebar';
 import PanelHandle from './components/PanelHandle';
+import { useConfirm } from './components/ConfirmDialog';
 import { useDebounce } from './hooks/useDebounce';
 import { useNoteHistory } from './hooks/useNoteHistory';
 import { useResizablePanel } from './hooks/useResizablePanel';
@@ -24,6 +25,9 @@ export default function App() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [saveState, setSaveState] = useState<SaveState>('idle');
+
+  /** アプリ内確認モーダル */
+  const confirm = useConfirm();
 
   // ---- レコメンド状態 ----
   const [recommend, setRecommend] = useState<RecommendResult>({
@@ -299,7 +303,13 @@ export default function App() {
   /** 現在のメモを削除する */
   const handleDelete = useCallback(async () => {
     if (currentId === null) return;
-    if (!window.confirm('このメモを削除しますか?')) return;
+    const ok = await confirm({
+      title: 'メモの削除',
+      message: 'このメモを削除しますか?この操作は元に戻せません。',
+      confirmLabel: '削除する',
+      danger: true,
+    });
+    if (!ok) return;
     dirtyRef.current = false;
     await window.api.deleteNote(currentId);
     history.remove(currentId); // 削除済みメモを履歴からも取り除く
@@ -317,7 +327,7 @@ export default function App() {
       setBody('');
       setSaveState('idle');
     }
-  }, [currentId, history.remove, history.push]);
+  }, [currentId, confirm, history.remove, history.push]);
 
   /** タイトル編集 */
   const handleChangeTitle = (v: string) => {

@@ -12,6 +12,7 @@
 //   * 暗号化キー     … メモの暗号化用。この端末の外へ送信されない
 // ============================================================
 import { useEffect, useState } from 'react';
+import { useConfirm } from './ConfirmDialog';
 import type { SyncStatus } from '../types';
 
 export default function SyncPanel() {
@@ -146,6 +147,7 @@ function SyncSettingsModal({
   const [passphrase, setPassphrase] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const confirm = useConfirm();
 
   // ログイン中は保存済みの暗号化キー(safeStorage で保護)をプリフィルする
   useEffect(() => {
@@ -175,8 +177,14 @@ function SyncSettingsModal({
   };
 
   const disable = async () => {
-    if (!window.confirm('同期を解除してローカルモードに戻しますか?(ローカルのメモは残ります)'))
-      return;
+    const ok = await confirm({
+      title: '同期の解除',
+      message:
+        '同期を解除してローカルモードに戻しますか?ローカルのメモはそのまま残ります。',
+      confirmLabel: '解除する',
+      danger: true,
+    });
+    if (!ok) return;
     await window.api.syncDisable();
     onClose();
   };
