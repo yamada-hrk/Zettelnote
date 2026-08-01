@@ -23,6 +23,7 @@
 // ============================================================
 const crypto = require('crypto');
 const express = require('express');
+const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 
 const PORT = Number(process.env.PORT || 8787);
@@ -59,6 +60,36 @@ function verifyPassword(password, stored) {
 }
 
 // ------------------------------------------------------------
+// レートリミット(総当たり攻撃対策)
+// ------------------------------------------------------------
+
+/**
+ * 認証エンドポイント用: 同一 IP あたり 15分間に失敗10回まで
+ * 成功したリクエストはカウントしない(正規ユーザーを閉め出さない)
+ */
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-7', // RateLimit-* ヘッダーで残回数を通知
+  legacyHeaders: false,
+  message: {
+    error: '試行回数が上限に達しました。15分ほど待ってからやり直してください',
+  },
+});
+
+/** データ系 API 用: 同一 IP あたり 1分間に120回まで(通常同期では到達しない) */
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    error: 'リクエストが多すぎます。しばらく待ってからやり直してください',
+  },
+});
+
+// ------------------------------------------------------------
 // 認証エンドポイント
 // ------------------------------------------------------------
 async function issueToken(userId) {
@@ -82,6 +113,7 @@ function validateCredentials(username, password) {
 
 app.post(
   '/api/auth/register',
+  authLimiter,
   ah(async (req, res) => {
     const { username, password } = req.body || {};
     const invalid = validateCredentials(username, password);
@@ -100,6 +132,7 @@ app.post(
 
 app.post(
   '/api/auth/login',
+  authLimiter,
   ah(async (req, res) => {
     const { username, password } = req.body || {};
     const r = await pool.query('SELECT id, pass_hash FROM users WHERE username = $1', [
@@ -119,6 +152,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 // ---- 認証ミドルウェア(トークン → user_id を解決) ----
+app.use('/api', apiLimiter);
 app.use(
   '/api',
   ah(async (req, res, next) => {
