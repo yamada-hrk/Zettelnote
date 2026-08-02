@@ -19,11 +19,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: [
-        'favicon-32.png',
-        'apple-touch-icon.png',
-        'icon-source.svg',
-      ],
+      includeAssets: ['favicon-32.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'ZettelNote',
         short_name: 'ZettelNote',
