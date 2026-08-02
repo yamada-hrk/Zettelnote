@@ -10,12 +10,13 @@
 // (将来の拡張ポイント)。検索(部分一致フィルタ)・関連メモ(意味的類似/
 // キーワード)は electron/search.js を直接共有している。
 // ============================================================
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useDebounce } from './hooks/useDebounce';
 import { useResizablePanel } from './hooks/useResizablePanel';
 import { useThresholdMode } from './hooks/useThresholdMode';
+import { useNoteHistory } from './hooks/useNoteHistory';
 import { useNotesStore } from './lib/notesStore';
 import { extractTags, keywordFilter } from './lib/search';
 import RecommendPanel from './RecommendPanel';
@@ -68,6 +69,8 @@ export default function NotesApp({
     CARD_MODE_EXIT,
   );
 
+  const history = useNoteHistory();
+
   const [selectedUid, setSelectedUid] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -94,9 +97,50 @@ export default function NotesApp({
     }
   }, [selected?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // 一覧未選択かつメモがあれば先頭を自動選択
+  /**
+   * メモを選択する
+   * @param record true なら閲覧履歴に記録する(戻る/進むによる遷移では false)
+   */
+  const selectNote = useCallback(
+    (uid: string, record: boolean) => {
+      setSelectedUid(uid);
+      if (record) history.push(uid);
+    },
+    [history.push]
+  );
+
+  /** 閲覧履歴を一つ戻る */
+  const handleBack = useCallback(() => {
+    const uid = history.back();
+    if (uid !== null) selectNote(uid, false);
+  }, [history.back, selectNote]);
+
+  /** 閲覧履歴を一つ進む */
+  const handleForward = useCallback(() => {
+    const uid = history.forward();
+    if (uid !== null) selectNote(uid, false);
+  }, [history.forward, selectNote]);
+
+  // キーボードショートカット: Alt+← で戻る / Alt+→ で進む(デスクトップ版と同一)
   useEffect(() => {
-    if (!selectedUid && notes.length > 0) setSelectedUid(notes[0].uid);
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+      if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        handleBack();
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        handleForward();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleBack, handleForward]);
+
+  // 一覧未選択かつメモがあれば先頭を自動選択(閲覧履歴の起点として記録する)
+  useEffect(() => {
+    if (!selectedUid && notes.length > 0) selectNote(notes[0].uid, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [notes, selectedUid]);
 
   const visibleNotes = useMemo(() => {
@@ -145,14 +189,15 @@ export default function NotesApp({
 
   const handleCreate = async () => {
     const uid = await create();
-    setSelectedUid(uid);
+    selectNote(uid, true);
   };
 
   const handleDelete = async () => {
     if (!selected) return;
     if (!confirm('このメモを削除しますか?')) return;
     await remove(selected.uid);
-    setSelectedUid(null);
+    history.remove(selected.uid); // 削除済みメモを履歴からも取り除く
+    setSelectedUid(null); // 次のメモは自動選択effectがselectNote経由で履歴に記録する
   };
 
   return (
@@ -236,7 +281,7 @@ export default function NotesApp({
                     key={note.uid}
                     note={note}
                     active={note.uid === selectedUid}
-                    onSelect={setSelectedUid}
+                    onSelect={(uid) => selectNote(uid, true)}
                   />
                 ))}
               </div>
@@ -249,7 +294,7 @@ export default function NotesApp({
                   return (
                     <li key={note.uid}>
                       <button
-                        onClick={() => setSelectedUid(note.uid)}
+                        onClick={() => selectNote(note.uid, true)}
                         className={`w-full rounded-xl px-3 py-2 text-left transition-colors ${
                           active
                             ? 'bg-white/[0.07] ring-1 ring-white/10'
@@ -317,6 +362,30 @@ export default function NotesApp({
         {selected ? (
           <>
             <div className="flex items-center gap-3 border-b border-white/5 px-5 py-2">
+              {/* 戻る / 進む(閲覧履歴のナビゲーション。デスクトップ版 Editor.tsx と同一の見た目) */}
+              <div className="flex gap-0.5">
+                <button
+                  onClick={handleBack}
+                  disabled={!history.canGoBack}
+                  title="戻る (Alt+←)"
+                  aria-label="前のメモに戻る"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
+                >
+                  <ChevronIcon direction="left" />
+                </button>
+                <button
+                  onClick={handleForward}
+                  disabled={!history.canGoForward}
+                  title="進む (Alt+→)"
+                  aria-label="次のメモに進む"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
+                >
+                  <ChevronIcon direction="right" />
+                </button>
+              </div>
+
+              <div className="h-5 w-px shrink-0 bg-white/10" />
+
               {/* 編集 / プレビュー切り替え(デスクトップ版 Editor.tsx と同一の見た目) */}
               <div className="flex rounded-lg bg-white/5 p-0.5 text-xs font-medium">
                 <button
@@ -416,7 +485,7 @@ export default function NotesApp({
           queryText={debouncedRecommendText}
           excludeUid={recommendExcludeUid}
           docs={recommendDocs}
-          onOpen={setSelectedUid}
+          onOpen={(uid) => selectNote(uid, true)}
         />
       </div>
     </div>
@@ -467,5 +536,23 @@ function NoteCard({
         </div>
       )}
     </button>
+  );
+}
+
+// ------------------------------------------------------------
+// 戻る/進むボタンのシェブロンアイコン(デスクトップ版 Editor.tsx と同一)
+// ------------------------------------------------------------
+function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" className="block">
+      <path
+        d={direction === 'left' ? 'M10 3 L5 8 L10 13' : 'M6 3 L11 8 L6 13'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
