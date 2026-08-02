@@ -74,6 +74,22 @@ function PanelGlyph({ side, open }: { side: 'left' | 'right'; open: boolean }) {
   );
 }
 
+/** 戻る/進むボタンのシェブロンアイコン(文字グリフより視認性が高い) */
+function ChevronIcon({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" className="block">
+      <path
+        d={direction === 'left' ? 'M10 3 L5 8 L10 13' : 'M6 3 L11 8 L6 13'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export default function Editor({
   noteId,
   title,
@@ -135,25 +151,27 @@ export default function Editor({
 
           <Divider />
 
-          {/* 戻る / 進む(閲覧履歴のナビゲーション) */}
+          {/* 戻る / 進む(閲覧履歴のナビゲーション)
+              32x32px の固定サイズ + 常時薄い背景で、クリック可能な
+              ボタンであることをホバー前から視認できるようにしている */}
           <div className="flex gap-0.5">
             <button
               onClick={onBack}
               disabled={!canGoBack}
               title="戻る (Alt+←)"
               aria-label="前のメモに戻る"
-              className="rounded-lg px-2 py-1 text-sm text-slate-400 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:active:scale-95 disabled:cursor-default disabled:text-slate-700"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
             >
-              ←
+              <ChevronIcon direction="left" />
             </button>
             <button
               onClick={onForward}
               disabled={!canGoForward}
               title="進む (Alt+→)"
               aria-label="次のメモに進む"
-              className="rounded-lg px-2 py-1 text-sm text-slate-400 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:active:scale-95 disabled:cursor-default disabled:text-slate-700"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
             >
-              →
+              <ChevronIcon direction="right" />
             </button>
           </div>
 
