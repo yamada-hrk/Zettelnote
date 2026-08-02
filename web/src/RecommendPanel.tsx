@@ -2,15 +2,15 @@
 // 右カラム: リアルタイム・レコメンド(Web版)
 //
 // デスクトップ版 RecommendSidebar.tsx の中核ロジック(タブ切替・
-// スコアバー・検索クエリ駆動への切替)を移植したもの。
-// electron/search.js の vectorSearch/keywordSearch をそのまま
-// 共有しているため、判定アルゴリズムはデスクトップ版と完全に同一
+// スコアバー・検索クエリ駆動への切替・タグによる繋がりの可視化)を
+// 移植したもの。electron/search.js の vectorSearch/keywordSearch を
+// そのまま共有しているため、判定アルゴリズムはデスクトップ版と完全に同一
 //
 // v1 スコープ: デスクトップ版のような順位ごとの情報量グラデーション
 // (リッチ/コンパクト/スリムの3段階)やホバー演出は簡略化している
 // ============================================================
 import { useEffect, useState } from 'react';
-import { vectorSearch, keywordSearch } from './lib/search';
+import { vectorSearch, keywordSearch, extractTags } from './lib/search';
 import type { RecommendItem } from './types';
 
 type Mode = 'vector' | 'keyword';
@@ -52,9 +52,22 @@ export default function RecommendPanel({
     const targets = docs
       .filter((d) => d.uid !== excludeUid)
       .map((d) => ({ id: d.uid, title: d.title, body: d.body }));
+
+    // 編集中メモ(またはクエリ)と各候補メモの共通タグを算出する
+    // (キーワード検索はタグ優先ソートのため search.js 内部で算出済みだが、
+    // ベクトル検索の結果には無いため、ここで両タブ共通に付与している。
+    // デスクトップ版 main.js の withSharedTags() と同じロジック)
+    const queryTags = extractTags(text);
+    const docTags = new Map(docs.map((d) => [d.uid, extractTags(d.body)]));
+    const withSharedTags = (items: RecommendItem[]) =>
+      items.map((item) => ({
+        ...item,
+        sharedTags: queryTags.filter((t) => (docTags.get(item.uid) ?? []).includes(t)),
+      }));
+
     setResults({
-      vector: vectorSearch(text, targets, 10),
-      keyword: keywordSearch(text, targets, 10),
+      vector: withSharedTags(vectorSearch(text, targets, 10)),
+      keyword: withSharedTags(keywordSearch(text, targets, 10)),
     });
   }, [queryText, excludeUid, docs]);
 
@@ -133,18 +146,38 @@ export default function RecommendPanel({
                       {item.excerpt}
                     </p>
                   )}
-                  {mode === 'keyword' && item.matchedTerms && item.matchedTerms.length > 0 && (
+                  {/* 編集中メモ(またはクエリ)と共通のハッシュタグ(バイオレット) */}
+                  {item.sharedTags && item.sharedTags.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {item.matchedTerms.map((t) => (
+                      {item.sharedTags.map((t) => (
                         <span
                           key={t}
-                          className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
+                          title="編集中のメモと同じタグ"
+                          className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300 ring-1 ring-violet-400/25"
                         >
-                          {t}
+                          #{t}
                         </span>
                       ))}
                     </div>
                   )}
+                  {mode === 'keyword' &&
+                    // 共通タグとして既に表示済みの語は重複表示しない
+                    (item.matchedTerms || []).filter(
+                      (t) => !(item.sharedTags || []).includes(t)
+                    ).length > 0 && (
+                      <div className="mt-1.5 flex flex-wrap gap-1">
+                        {(item.matchedTerms || [])
+                          .filter((t) => !(item.sharedTags || []).includes(t))
+                          .map((t) => (
+                            <span
+                              key={t}
+                              className="rounded bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
+                            >
+                              {t}
+                            </span>
+                          ))}
+                      </div>
+                    )}
                   <div className="mt-2 flex items-center gap-2">
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
                       <div

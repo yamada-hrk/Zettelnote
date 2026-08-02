@@ -31,4 +31,6 @@ export interface RecommendItem {
   excerpt: string;
   score: number;
   matchedTerms?: string[];
+  /** 編集中メモ(またはクエリ)と共通のハッシュタグ(タグによる繋がりの可視化用) */
+  sharedTags?: string[];
 }
