@@ -11,6 +11,8 @@
 // キーワード)は electron/search.js を直接共有している。
 // ============================================================
 import { useEffect, useMemo, useState } from 'react';
+import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { useDebounce } from './hooks/useDebounce';
 import { useResizablePanel } from './hooks/useResizablePanel';
 import { useThresholdMode } from './hooks/useThresholdMode';
@@ -70,8 +72,16 @@ export default function NotesApp({
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [saveState, setSaveState] = useState<SaveState>('idle');
+  const [preview, setPreview] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebounce(searchQuery, 150);
+
+  // Markdown → HTML(XSS 対策として DOMPurify でサニタイズ。デスクトップ版 Editor.tsx と同一ロジック)
+  const previewHtml = useMemo(() => {
+    if (!preview) return '';
+    const raw = marked.parse(body, { async: false }) as string;
+    return DOMPurify.sanitize(raw);
+  }, [preview, body]);
 
   const selected = notes.find((n) => n.uid === selectedUid) ?? null;
 
@@ -307,6 +317,30 @@ export default function NotesApp({
         {selected ? (
           <>
             <div className="flex items-center gap-3 border-b border-white/5 px-5 py-2">
+              {/* 編集 / プレビュー切り替え(デスクトップ版 Editor.tsx と同一の見た目) */}
+              <div className="flex rounded-lg bg-white/5 p-0.5 text-xs font-medium">
+                <button
+                  onClick={() => setPreview(false)}
+                  className={`rounded-md px-3 py-1 transition-colors ${
+                    !preview
+                      ? 'bg-white/10 text-indigo-300 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  ✏️ 編集
+                </button>
+                <button
+                  onClick={() => setPreview(true)}
+                  className={`rounded-md px-3 py-1 transition-colors ${
+                    preview
+                      ? 'bg-white/10 text-indigo-300 shadow-sm'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  👁 プレビュー
+                </button>
+              </div>
+
               <span className="text-xs text-slate-500">
                 {saveState === 'saving'
                   ? '保存中…'
@@ -331,16 +365,24 @@ export default function NotesApp({
               placeholder="タイトルを入力…"
               className="border-b border-white/5 bg-transparent px-6 py-4 text-xl font-bold text-slate-100 outline-none placeholder:text-slate-600"
             />
-            <textarea
-              value={body}
-              onChange={(e) => {
-                setBody(e.target.value);
-                setSaveState('dirty');
-              }}
-              placeholder="ここに Markdown でメモを書く…"
-              className="thin-scrollbar flex-1 resize-none bg-transparent px-6 py-4 font-mono text-sm leading-relaxed text-slate-300 outline-none placeholder:text-slate-600"
-              spellCheck={false}
-            />
+            {preview ? (
+              <div
+                className="markdown-body thin-scrollbar flex-1 overflow-y-auto px-6 py-4"
+                // marked の出力を DOMPurify でサニタイズ済み
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+              />
+            ) : (
+              <textarea
+                value={body}
+                onChange={(e) => {
+                  setBody(e.target.value);
+                  setSaveState('dirty');
+                }}
+                placeholder="ここに Markdown でメモを書く…"
+                className="thin-scrollbar flex-1 resize-none bg-transparent px-6 py-4 font-mono text-sm leading-relaxed text-slate-300 outline-none placeholder:text-slate-600"
+                spellCheck={false}
+              />
+            )}
           </>
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-slate-500">

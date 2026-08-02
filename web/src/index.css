@@ -37,3 +37,49 @@ body {
 .thin-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ============================================================
+   Markdown プレビューの見た目(src/index.css と同一のダーク・タイポグラフィ)
+   ============================================================ */
+.markdown-body {
+  line-height: 1.8;
+  color: rgb(203 213 225); /* slate-300 */
+}
+.markdown-body h1 { font-size: 1.5rem; font-weight: 700; margin: 1.2em 0 0.5em; border-bottom: 1px solid rgb(255 255 255 / 0.08); padding-bottom: 0.3em; color: rgb(241 245 249); }
+.markdown-body h2 { font-size: 1.25rem; font-weight: 700; margin: 1.2em 0 0.5em; color: rgb(241 245 249); }
+.markdown-body h3 { font-size: 1.1rem; font-weight: 600; margin: 1em 0 0.4em; color: rgb(226 232 240); }
+.markdown-body p  { margin: 0.6em 0; }
+.markdown-body ul, .markdown-body ol { margin: 0.6em 0; padding-left: 1.6em; }
+.markdown-body ul { list-style: disc; }
+.markdown-body ol { list-style: decimal; }
+.markdown-body li { margin: 0.2em 0; }
+.markdown-body blockquote {
+  border-left: 3px solid rgb(99 102 241 / 0.5); /* indigo の輝線 */
+  padding-left: 1em;
+  color: rgb(148 163 184);
+  margin: 0.8em 0;
+}
+.markdown-body code {
+  background: rgb(255 255 255 / 0.08);
+  border-radius: 4px;
+  padding: 0.15em 0.4em;
+  font-size: 0.9em;
+  font-family: Consolas, "Courier New", monospace;
+  color: rgb(199 210 254); /* indigo-200 */
+}
+.markdown-body pre {
+  background: rgb(0 0 0 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.08);
+  color: rgb(226 232 240);
+  border-radius: 10px;
+  padding: 1em;
+  overflow-x: auto;
+  margin: 0.8em 0;
+}
+.markdown-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+.markdown-body a { color: rgb(129 140 248); text-decoration: underline; }
+.markdown-body hr { border: none; border-top: 1px solid rgb(255 255 255 / 0.08); margin: 1.5em 0; }
