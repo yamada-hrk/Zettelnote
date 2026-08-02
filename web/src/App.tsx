@@ -12,6 +12,7 @@ import LoginScreen, { type Auth } from './screens/LoginScreen';
 import UnlockScreen from './screens/UnlockScreen';
 import NotesApp from './NotesApp';
 import { clearKey, loadKey } from './lib/keyStore';
+import { clearNoteCache } from './lib/noteCache';
 
 const AUTH_KEY = 'zettelnote:auth';
 
@@ -57,14 +58,20 @@ export default function App() {
 
   const handleLogout = () => {
     if (auth) void clearKey(auth.username); // ログアウト時は保存済みキーも必ず削除する
+    void clearNoteCache(); // 復号済みメモのキャッシュも残さない
     localStorage.removeItem(AUTH_KEY);
     setAuth(null);
     setCryptoKey(null);
   };
 
-  /** アカウントは維持したまま、保存済みキーだけ削除して再入力を求める */
+  /**
+   * アカウントは維持したまま、保存済みキーだけ削除して再入力を求める。
+   * メモのキャッシュ(平文)も一緒に消す: 鍵を「忘れた」のに復号済みの
+   * 内容だけブラウザに残っていては、鍵を保護する意味が薄れるため
+   */
   const handleForgetKey = () => {
     if (auth) void clearKey(auth.username);
+    void clearNoteCache();
     setCryptoKey(null);
   };
 
