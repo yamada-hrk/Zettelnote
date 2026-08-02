@@ -8,13 +8,51 @@
 //   ビルド成果物のプリキャッシュ・SWの世代管理を任せている。
 //   API(/api/*)はキャッシュ対象に含めない(既存の IndexedDB キャッシュが
 //   データ面の高速化を担っており、SW はアプリ本体の即時起動が役割)
-import { defineConfig } from 'vite';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// electron/search.js・electron/tags.js は Electron(Node/CJS)側で require()
+// される都合上 CommonJS のまま(module.exports/require)になっている。
+// vite build(本番)は Rollup が CJS→ESM 変換を行うため問題ないが、
+// dev サーバーは相対 import を素の ESM としてブラウザへそのまま返すため
+// require が未定義の ReferenceError になる。この2ファイルに限り、
+// dev サーバー配信時だけ CJS 構文を ESM に書き換える(ファイル自体は
+// 変更しない。Electron 側の require() には一切影響しない)。
+function sharedCjsToEsmForDev(): Plugin {
+  // Vite の module id は POSIX 区切り(/)に正規化されるが、path.resolve() は
+  // Windows では \ 区切りを返すため、比較前に両方を / 区切りへ揃える
+  const toPosix = (p: string) => p.replace(/\\/g, '/');
+  const targets = new Set([
+    toPosix(resolve(__dirname, '../electron/search.js')),
+    toPosix(resolve(__dirname, '../electron/tags.js')),
+  ]);
+  return {
+    name: 'shared-cjs-to-esm-dev',
+    apply: 'serve',
+    enforce: 'pre',
+    transform(code, id) {
+      const file = toPosix(id.split('?')[0]);
+      if (!targets.has(file)) return;
+      const esm = code
+        .replace(
+          /const\s*\{\s*extractTags\s*\}\s*=\s*require\(['"]\.\/tags['"]\);?/,
+          "import { extractTags } from './tags.js';",
+        )
+        .replace(/module\.exports\s*=\s*(\{[^}]*\});?/, 'export $1;');
+      return { code: esm, map: null };
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
+    sharedCjsToEsmForDev(),
     react(),
     tailwindcss(),
     VitePWA({

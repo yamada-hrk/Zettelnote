@@ -22,8 +22,8 @@ export default function RecommendPanel({
   docs,
   onOpen,
 }: {
-  /** パネルの幅(px)。リサイズ対応のため親から渡される */
-  width: number;
+  /** パネルの幅。リサイズ対応のため親から渡される(モバイル全画面表示時は '100%') */
+  width: number | string;
   /** 連想の基準になるテキスト(編集中メモ、または検索クエリ) */
   queryText: string;
   /** 除外するメモ(編集中メモ自身。検索クエリ駆動時は null) */
@@ -32,7 +32,10 @@ export default function RecommendPanel({
   onOpen: (uid: string) => void;
 }) {
   const [mode, setMode] = useState<Mode>('vector');
-  const [results, setResults] = useState<{ vector: RecommendItem[]; keyword: RecommendItem[] }>({
+  const [results, setResults] = useState<{
+    vector: RecommendItem[];
+    keyword: RecommendItem[];
+  }>({
     vector: [],
     keyword: [],
   });
@@ -62,7 +65,9 @@ export default function RecommendPanel({
     const withSharedTags = (items: RecommendItem[]) =>
       items.map((item) => ({
         ...item,
-        sharedTags: queryTags.filter((t) => (docTags.get(item.uid) ?? []).includes(t)),
+        sharedTags: queryTags.filter((t) =>
+          (docTags.get(item.uid) ?? []).includes(t),
+        ),
       }));
 
     setResults({
@@ -163,7 +168,7 @@ export default function RecommendPanel({
                   {mode === 'keyword' &&
                     // 共通タグとして既に表示済みの語は重複表示しない
                     (item.matchedTerms || []).filter(
-                      (t) => !(item.sharedTags || []).includes(t)
+                      (t) => !(item.sharedTags || []).includes(t),
                     ).length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
                         {(item.matchedTerms || [])
@@ -182,7 +187,9 @@ export default function RecommendPanel({
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
                       <div
                         className="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-400"
-                        style={{ width: `${Math.round(Math.min(Math.max(item.score, 0), 1) * 100)}%` }}
+                        style={{
+                          width: `${Math.round(Math.min(Math.max(item.score, 0), 1) * 100)}%`,
+                        }}
                       />
                     </div>
                     <span className="text-[10px] tabular-nums text-slate-500">
