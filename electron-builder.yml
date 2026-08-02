@@ -28,6 +28,9 @@ npmRebuild: false
 forceCodeSigning: false
 
 win:
+  # build/icon.ico(複数解像度を1ファイルに埋め込んだWindows用アイコン。
+  # Web版の PWA アイコンと同じソース画像から生成。詳細は仕様書 §11.13/§11.14)
+  icon: build/icon.ico
   target:
     - target: nsis
       arch: [x64]
