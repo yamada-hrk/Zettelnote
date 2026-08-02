@@ -16,11 +16,14 @@ import type { RecommendItem } from './types';
 type Mode = 'vector' | 'keyword';
 
 export default function RecommendPanel({
+  width,
   queryText,
   excludeUid,
   docs,
   onOpen,
 }: {
+  /** パネルの幅(px)。リサイズ対応のため親から渡される */
+  width: number;
   /** 連想の基準になるテキスト(編集中メモ、または検索クエリ) */
   queryText: string;
   /** 除外するメモ(編集中メモ自身。検索クエリ駆動時は null) */
@@ -58,7 +61,10 @@ export default function RecommendPanel({
   const items = mode === 'vector' ? results.vector : results.keyword;
 
   return (
-    <aside className="flex w-80 shrink-0 flex-col border-l border-white/5 bg-white/[0.02]">
+    <aside
+      style={{ width }}
+      className="flex h-full shrink-0 flex-col bg-white/[0.02]"
+    >
       <div className="border-b border-white/5 px-4 py-3.5">
         <div className="flex items-center gap-2">
           <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-200">
