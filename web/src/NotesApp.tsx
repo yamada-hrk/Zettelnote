@@ -1,15 +1,16 @@
 // ============================================================
 // メイン画面(Web版)
 //
-// v1 スコープ: リスト + 検索 + エディタのシンプルな2ペイン構成。
-// デスクトップ版の3カラム・レコメンドサイドバー・俯瞰モード等の
-// リッチな UI はまだ移植していない(将来の拡張ポイント)。
-// 検索(部分一致フィルタ)は electron/search.js を直接共有している。
+// v1 スコープ: リスト + 検索 + エディタ + 関連メモの3ペイン構成。
+// デスクトップ版の俯瞰モード・ハッシュタグパネル等のリッチな UI は
+// まだ移植していない(将来の拡張ポイント)。検索(部分一致フィルタ)・
+// 関連メモ(意味的類似/キーワード)は electron/search.js を直接共有している。
 // ============================================================
 import { useEffect, useMemo, useState } from 'react';
 import { useDebounce } from './hooks/useDebounce';
 import { useNotesStore } from './lib/notesStore';
 import { extractTags, keywordFilter } from './lib/search';
+import RecommendPanel from './RecommendPanel';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved';
 
@@ -61,6 +62,16 @@ export default function NotesApp({
   }, [notes, debouncedQuery]);
 
   const debouncedDraft = useDebounce({ title, body }, 800);
+
+  // ---- 関連メモ(検索中はクエリ起点、それ以外は編集中メモ起点) ----
+  // デスクトップ版と同じ役割分担: 検索クエリがあればそちらを優先する
+  const recommendRaw = searchQuery.trim() ? searchQuery : `${title}\n${body}`;
+  const debouncedRecommendText = useDebounce(recommendRaw, 600);
+  const recommendExcludeUid = searchQuery.trim() ? null : (selected?.uid ?? null);
+  const recommendDocs = useMemo(
+    () => notes.map((n) => ({ uid: n.uid, title: n.title, body: n.body })),
+    [notes]
+  );
 
   // 自動保存(デスクトップ版と同じ 800ms デバウンス)
   useEffect(() => {
@@ -226,6 +237,14 @@ export default function NotesApp({
           </div>
         )}
       </main>
+
+      {/* 右: 関連メモ(意味的類似 / キーワード) */}
+      <RecommendPanel
+        queryText={debouncedRecommendText}
+        excludeUid={recommendExcludeUid}
+        docs={recommendDocs}
+        onOpen={setSelectedUid}
+      />
     </div>
   );
 }
