@@ -21,6 +21,12 @@ files:
 # (再ビルドには Visual Studio Build Tools が必要になり、環境要求が増える)
 npmRebuild: false
 
+# コード署名は electron-builder では行わない(証明書ファイルを持たない)。
+# 署名は CI の後段ジョブ(SignPath)が未署名インストーラーに対して行う。
+# CSC_IDENTITY_AUTO_DISCOVERY=false と合わせて、ローカル/CI に偶然証明書が
+# あっても electron-builder が自動署名を試みないようにしている
+forceCodeSigning: false
+
 win:
   target:
     - target: nsis

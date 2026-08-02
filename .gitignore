@@ -4,3 +4,8 @@ release/
 *.tmp.js
 
 tmp/*
+
+# Claude Code のローカル作業ファイル(内部向け仕様書・スキル定義)
+# 公開リポジトリには含めない。README がユーザー向けの正本ドキュメント
+仕様書_claude.md
+.claude/

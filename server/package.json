@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "ツェッテルカステン同期サーバー(暗号化済みデータのみを保存するゼロ知識ストア)",
   "private": true,
+  "license": "MIT",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"

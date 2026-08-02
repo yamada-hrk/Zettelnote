@@ -1,10 +1,33 @@
 # ============================================================
 # リリースワークフロー
-# - トリガー: v*.*.* 形式のタグ push(例: v0.2.1)
+# - トリガー: v*.*.* 形式のタグ push(例: v0.3.0)
 # - windows-latest で Electron アプリをビルドし、
 #   NSIS インストーラーを GitHub Releases に自動添付する
-# - 将来 macOS / Linux を追加する場合は matrix.include に
-#   コメントアウト済みのエントリを有効化するだけでよい
+#
+# ■ SignPath 連携について(OSS 向け無償コード署名)
+#   build → sign-windows → publish の3段ジョブ構成。
+#   sign-windows はリポジトリ変数 vars.SIGNPATH_ENABLED が 'true' の
+#   ときだけ実行される。SignPath 申請の承認前・Secrets 未設定の状態でも
+#   このワークフローは「未署名ビルド」としてそのまま動作し続ける
+#   (=このファイルを書き換えなくても、承認後は変数を切り替えるだけで
+#   署名入りリリースに移行できる)。
+#
+#   有効化に必要な準備(すべて GitHub 側の設定・SignPath ダッシュボードでの
+#   作業で、コードの変更は不要):
+#     1. リポジトリを Public にする(SignPath Foundation の必須条件)
+#     2. signpath.io で OSS 無償プランに申請し、承認を受ける
+#     3. SignPath 側で Project / Signing Policy / Artifact Configuration を作成
+#        (project-slug 等は下記の値と合わせる、または下記を実際の値に書き換える)
+#     4. Settings > Secrets and variables > Actions に
+#        SIGNPATH_API_TOKEN(Secret)と SIGNPATH_ORG_ID(Variable)を追加
+#     5. Settings > Environments に "signpath" を作成し、
+#        Required reviewers を設定(誰が署名を承認できるかを制限する)
+#     6. リポジトリ変数 SIGNPATH_ENABLED を 'true' にする
+#   詳細は README の「コード署名(SignPath)」を参照。
+#
+# - 将来 macOS / Linux を追加する場合は、build ジョブを matrix 化し、
+#   sign-windows と同様の署名ジョブ(Apple は公証 = Notarization)を
+#   OS ごとに追加する。現状は Windows 単体のため matrix 化していない
 # ============================================================
 name: Release
 
@@ -18,22 +41,11 @@ permissions:
   contents: write
 
 jobs:
+  # ---- ビルド(未署名の成果物を作る。SignPath 未設定でも常に実行される) ----
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            args: --win
-          # 将来 macOS を追加する場合(要コード署名の検討):
-          # - os: macos-latest
-          #   args: --mac
-          # 将来 Linux を追加する場合:
-          # - os: ubuntu-latest
-          #   args: --linux
-
-    runs-on: ${{ matrix.os }}
-
+    runs-on: windows-latest
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -50,17 +62,103 @@ jobs:
       - name: レンダラーをビルド (Vite)
         run: npm run build
 
-      - name: アプリをパッケージング (electron-builder)
-        run: npx electron-builder ${{ matrix.args }} --publish never
+      - name: アプリをパッケージング (electron-builder・署名は行わない)
+        run: npx electron-builder --win --publish never
+        env:
+          # CI に偶然証明書が転がっていても自動署名を試みさせない
+          # (署名は後段の sign-windows ジョブが SignPath 経由で行う)
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
 
-      - name: GitHub Releases へアップロード
+      - name: 未署名インストーラーをアーティファクトとして保存
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: release/*.exe
+          retention-days: 7
+
+  # ---- SignPath でコード署名(SIGNPATH_ENABLED = 'true' のときだけ実行) ----
+  sign-windows:
+    needs: build
+    if: vars.SIGNPATH_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # 署名の実行を承認制にするための Environment。
+    # Settings > Environments > signpath で Required reviewers を設定すること
+    environment: signpath
+    steps:
+      - name: SignPath へ署名リクエストを送信し、署名済みファイルを取得
+        uses: signpath-io/github-action-submit-signing-request@v1
+        with:
+          api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
+          organization-id: '${{ vars.SIGNPATH_ORG_ID }}'
+          project-slug: 'zettelnote'
+          signing-policy-slug: 'release-signing'
+          artifact-configuration-slug: 'zettelnote-windows'
+          github-artifact-id: '${{ needs.build.outputs.artifact-id }}'
+          wait-for-completion: true
+          output-artifact-directory: signed
+
+      - name: 署名済みインストーラーをアーティファクトとして保存
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-signed
+          path: signed/*.exe
+          retention-days: 7
+
+  # ---- GitHub Releases へ公開(署名済みがあればそちらを優先) ----
+  publish:
+    needs: [build, sign-windows]
+    # sign-windows が「成功」または「(SIGNPATH_ENABLED=false で)スキップ」なら公開する。
+    # sign-windows が明示的に失敗した場合は、未署名を黙って公開せずワークフロー全体を失敗させる
+    if: |
+      always() &&
+      needs.build.result == 'success' &&
+      (needs.sign-windows.result == 'success' || needs.sign-windows.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: 未署名ビルドを取得
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer-unsigned
+          path: dist-unsigned
+
+      - name: 署名済みビルドを取得(SignPath 未設定時は存在しないためスキップ)
+        if: needs.sign-windows.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer-signed
+          path: dist-signed
+
+      - name: 公開する成果物を選ぶ(署名済みがあれば優先)
+        id: pick
+        shell: bash
+        run: |
+          if [ -n "$(ls -A dist-signed/*.exe 2>/dev/null)" ]; then
+            echo "dir=dist-signed" >> "$GITHUB_OUTPUT"
+            echo "signed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=dist-unsigned" >> "$GITHUB_OUTPUT"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: GitHub Releases へアップロード(署名済みビルド)
+        if: steps.pick.outputs.signed == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          # タグ名がそのままリリース名になる。本文はコミット履歴から自動生成
           generate_release_notes: true
-          files: |
-            release/*.exe
-            release/*.blockmap
-            release/latest*.yml
+          files: ${{ steps.pick.outputs.dir }}/*.exe
+          body: |
+            🔏 このビルドは [SignPath.io](https://signpath.io) によりコード署名されています。
+
+            Free code signing provided by SignPath.io, certificate by SignPath Foundation
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: GitHub Releases へアップロード(未署名ビルド)
+        if: steps.pick.outputs.signed == 'false'
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: ${{ steps.pick.outputs.dir }}/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

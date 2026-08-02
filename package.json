@@ -1,8 +1,18 @@
 {
   "name": "zettelkasten-local",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "ローカル完結型ツェッテルカステン・メモアプリ（ステップ1プロトタイプ）",
   "private": true,
+  "license": "MIT",
+  "author": "Zettelnote Contributors",
+  "homepage": "https://github.com/yamada-hrk/Zettelnote",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yamada-hrk/Zettelnote.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yamada-hrk/Zettelnote/issues"
+  },
   "main": "electron/main.js",
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",

@@ -1,10 +1,39 @@
-# ローカル完結型ツェッテルカステン・メモアプリ(ステップ1)
+# ZettelNote
 
-ネットワーク接続を一切必要とせず、完全ローカル環境で動作するメモアプリのプロトタイプです。
-編集中のテキストに対して、過去のメモをリアルタイムでレコメンドします。
+[![Release](https://github.com/yamada-hrk/Zettelnote/actions/workflows/release.yml/badge.svg)](https://github.com/yamada-hrk/Zettelnote/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![GitHub release](https://img.shields.io/github/v/release/yamada-hrk/Zettelnote)](https://github.com/yamada-hrk/Zettelnote/releases)
 
-> **全機能の詳細仕様は [`仕様書_claude.md`](./仕様書_claude.md) を正本として参照してください。**
-> 以降の機能追加・変更は仕様書側に反映されます(`.claude/skills/update-specs` スキル)。
+ネットワーク接続を一切必要とせず、完全ローカル環境で動作するツェッテルカステン(Zettelkasten)方式のメモアプリです。
+編集中のテキストに対して、過去のメモを意味的類似度・キーワード・ハッシュタグの観点からリアルタイムでレコメンドし、
+知識の繋がりを可視化します。任意でサーバー同期(ゼロ知識暗号化)も利用できます。
+
+## 目次
+
+- [ダウンロード](#ダウンロード)
+- [主な機能](#主な機能)
+- [技術スタックと選定理由](#技術スタックと選定理由)
+- [ディレクトリ構成](#ディレクトリ構成)
+- [セットアップと起動](#セットアップと起動)
+- [コード署名(SignPath)](#コード署名signpath)
+- [コントリビューション](#コントリビューション)
+- [ライセンス](#ライセンス)
+
+## ダウンロード
+
+Windows 版インストーラーは [Releases](https://github.com/yamada-hrk/Zettelnote/releases) から
+最新版の `ZettelNote-Setup-x.y.z.exe` をダウンロードしてください。`v*.*.*` タグの push ごとに
+GitHub Actions が自動ビルド・公開します(詳細は [コード署名](#コード署名signpath) 参照)。
+
+## 主な機能
+
+- **ローカルファースト**: インストール直後からログイン不要で全機能が使える。データは端末の SQLite に保存
+- **Markdown エディタ**: 編集 / プレビュー切替、フローティングツールバー、閲覧履歴の戻る・進む
+- **リアルタイム・レコメンド**: 意味的類似(文字バイグラム TF-IDF)とキーワード一致を常時提示
+- **ハイブリッド検索**: 左ペインのキーワード絞り込み + 右ペインの AI 連想検索を同時表示(`Ctrl+K`)
+- **ハッシュタグ**: `#タグ名` の自動認識、タグパネルでの一覧・絞り込み、関連メモでの繋がり可視化
+- **サイドバーのリサイズ・開閉**: ドラッグでの幅調整、`Ctrl+B` / `Ctrl+Shift+B` での開閉、レイアウト永続化
+- **クラウド同期(オプトイン)**: アカウント制ログイン + クライアントサイド暗号化(サーバーは暗号鍵を持たないゼロ知識設計)。既定はオフで、設定するまでは一切サーバー通信を行わない
 
 ## 技術スタックと選定理由
 
@@ -14,7 +43,9 @@
 | フロントエンド | React 19 / TypeScript / Tailwind CSS v4 | 仕様指定どおり。Tailwind v4 は設定ファイル不要で Vite プラグインのみで動作 |
 | ビルド | Vite 8 | 高速な HMR。`base: './'` 設定で Electron の `file://` 読み込みにも対応 |
 | DB | SQLite (**better-sqlite3**) | 同期 API で高速・堅牢。Electron 用プリビルドバイナリで動作確認済み(ネイティブビルド不要) |
-| 検索 | 文字バイグラム TF-IDF + コサイン類似度(自前実装) | 「ネットワーク接続を一切必要としない」要件を厳守するため、モデルダウンロードが必要な埋め込みモデルはステップ1では見送り。日本語を分かち書きなしで扱える文字バイグラム方式を採用。`electron/search.js` の `vectorSearch()` を差し替えるだけでローカル埋め込みモデル(例: multilingual-e5-small + ONNX Runtime)へ移行できる構造 |
+| 検索 | 文字バイグラム TF-IDF + コサイン類似度(自前実装) | 「ネットワーク接続を一切必要としない」要件を厳守するため、モデルダウンロードが必要な埋め込みモデルは見送り。日本語を分かち書きなしで扱える文字バイグラム方式を採用。`electron/search.js` の `vectorSearch()` を差し替えるだけでローカル埋め込みモデル(例: multilingual-e5-small + ONNX Runtime)へ移行できる構造 |
+| 同期サーバー | Node.js / Express + PostgreSQL 16 | Docker Compose で一発起動。暗号化済みデータのみを保存するゼロ知識ストア |
+| パッケージング | electron-builder | Windows 向け NSIS インストーラーを生成。GitHub Actions で自動ビルド |
 
 ## ディレクトリ構成
 
@@ -23,24 +54,32 @@ Zettelkasten/
 ├── electron/               # メインプロセス(CommonJS・ビルド不要)
 │   ├── main.js             # ウィンドウ生成・IPC ハンドラ登録
 │   ├── preload.js          # contextBridge で window.api を安全に公開
-│   ├── db.js               # SQLite データアクセス層(CRUD)
-│   ├── search.js           # ベクトル検索・キーワード検索(完全ローカル)
-│   └── tags.js             # ハッシュタグ抽出(#タグ名 の認識・正規化)
-├── src/                    # レンダラー(React / TypeScript)
-│   ├── main.tsx            # エントリポイント
-│   ├── App.tsx             # 3カラムレイアウト・状態管理・自動保存
+│   ├── db.js               # SQLite データアクセス層(CRUD・同期用マイグレーション)
+│   ├── search.js           # ベクトル検索・キーワード検索・検索バー用フィルタ(完全ローカル)
+│   ├── tags.js              # ハッシュタグ抽出(#タグ名 の認識・正規化)
+│   ├── crypto.js            # クライアントサイド暗号化(scrypt + AES-256-GCM)
+│   └── sync.js               # サーバー同期エンジン(LWW 差分同期)
+├── server/                  # 同期バックエンド(Express + PostgreSQL、Docker Compose で起動)
+├── src/                     # レンダラー(React / TypeScript)
+│   ├── main.tsx             # エントリポイント
+│   ├── App.tsx              # 3カラムレイアウト・状態管理・自動保存・検索制御
 │   ├── components/
-│   │   ├── NoteList.tsx    # 左: メモ一覧 + タグパネル
-│   │   ├── Editor.tsx      # 中央: Markdown エディタ + プレビュー + フローティングツールバー
-│   │   ├── PanelHandle.tsx # サイドバー境界線(ドラッグリサイズ + 開閉トグル)
-│   │   └── RecommendSidebar.tsx  # 右: レコメンド(タブ / グラデーションUI / ホバー演出)
+│   │   ├── NoteList.tsx     # 左: 検索バー・メモ一覧・タグパネル・同期パネル
+│   │   ├── Editor.tsx       # 中央: Markdown エディタ + プレビュー + フローティングツールバー
+│   │   ├── PanelHandle.tsx  # サイドバー境界線(ドラッグリサイズ + 開閉トグル)
+│   │   ├── RecommendSidebar.tsx # 右: レコメンド / AI 連想検索(タブ・グラデーションUI)
+│   │   ├── SyncPanel.tsx    # クラウド同期の設定・ステータス表示
+│   │   └── ConfirmDialog.tsx # アプリ内確認モーダル
 │   ├── hooks/
-│   │   ├── useDebounce.ts  # デバウンス処理
+│   │   ├── useDebounce.ts        # デバウンス処理
 │   │   ├── useNoteHistory.ts     # 閲覧履歴スタック(戻る / 進む)
 │   │   └── useResizablePanel.ts  # サイドバーの幅・開閉状態(localStorage 永続化)
-│   ├── types.ts            # 共有型定義
-│   ├── global.d.ts         # window.api の型定義
-│   └── index.css           # Tailwind + Markdown プレビュー用スタイル
+│   ├── types.ts             # 共有型定義
+│   ├── global.d.ts          # window.api の型定義
+│   └── index.css            # Tailwind + Markdown プレビュー用スタイル
+├── docker-compose.yml        # 同期バックエンドの起動設定
+├── electron-builder.yml      # デスクトップアプリのパッケージング設定
+├── .github/workflows/         # CI/CD(リリース自動化)
 ├── index.html
 ├── vite.config.ts
 ├── tsconfig.json
@@ -63,17 +102,19 @@ npm start
 npm run dist
 ```
 
+DB ファイルは `%APPDATA%\zettelkasten-local\zettelkasten.db` に保存されます
+(パッケージ版は `%APPDATA%\ZettelNote\` )。
+
 ### リリース(GitHub Actions)
 
 `v*.*.*` 形式のタグを push すると、GitHub Actions が Windows インストーラーをビルドして
-GitHub Releases に自動添付します(`.github/workflows/release.yml`)。追加のシークレット設定は不要です。
+GitHub Releases に自動添付します(`.github/workflows/release.yml`)。SignPath 未設定でも
+未署名ビルドとして問題なく動作します。
 
 ```powershell
 git tag -a v0.3.0 -m "リリース内容"
 git push origin v0.3.0
 ```
-
-DB ファイルは `%APPDATA%\zettelkasten-local\zettelkasten.db` に保存されます。
 
 ### Step2: 同期バックエンドの起動(任意)
 
@@ -91,78 +132,25 @@ docker compose down
 メモは**端末側で暗号化してから**送信され、サーバーには暗号文のみが保存されます。
 暗号化キーはサーバーに送信されず、パスワード(認証用)とも独立しています(詳細は仕様書 §5.8)。
 
-## 実装済み機能(ステップ1スコープ)
+## コード署名(SignPath)
 
-### ① メモの CRUD
-- Markdown 形式での作成・編集・削除、プレビュー表示(marked + DOMPurify)
-- 入力停止 **800ms** 後に SQLite へ自動保存(保存状態インジケーター付き)
+Windows 版インストーラーは、オープンソースプロジェクト向けの無償コード署名サービス
+**[SignPath.io](https://signpath.io)**(証明書提供: SignPath Foundation)への対応を準備しています。
 
-### ② リアルタイム・レコメンドサイドバー
-- **デバウンス**: 入力停止 **600ms** 後にバックグラウンド(メインプロセス)で類似検索
-- **タブ切替**: 「✨ 意味的類似(ベクトル)」/「🔤 キーワード」の各 Top10
-  - キーワードタブは**ハッシュタグ一致を最優先**で表示(詳細は「③ ハッシュタグ機能」参照)
-- **グラデーションUI**:
-  - 1〜3位 … カード表示(抜粋3行 + 類似度スコアバー + 一致語チップ)
-  - 4〜6位 … コンパクト表示(抜粋1行)
-  - 7位以下 … スリム表示(タイトルのみ)+ 順位に応じて透明度を下げる
-- **マイクロインタラクション**:
-  - ホバーで `scale(1.03)` の滑らかな拡大(サイドバーのパディング内に収まり枠を越境しない)
-  - スリム表示アイテムはホバー時に抜粋がスライド展開
+> Free code signing provided by [SignPath.io](https://signpath.io), certificate by [SignPath Foundation](https://signpath.org/)
 
-### ③ ハッシュタグ機能
+- **現状**: SignPath への申請待ち・審査待ちの段階です。承認後、GitHub Actions のリリースワークフローに
+  署名ステップが自動的に有効化されます(`vars.SIGNPATH_ENABLED` を `true` に切り替えるだけで、
+  ワークフロー自体の変更は不要な設計にしてあります)
+- **署名なしの現在**: ダウンロードしたインストーラー実行時に Windows SmartScreen の警告が表示されます。
+  発行元を確認のうえ「詳細情報」→「実行」で続行してください
+- 導入の技術的な詳細は `.github/workflows/release.yml` のコメントを参照
 
-#### 入力と認識
-- 本文中の `#タグ名`(例: `#Zettelkasten` `#アイデア`)を保存時の本文から自動認識する(`electron/tags.js`)
-- 認識ルール:
-  - `#` の直前が「行頭・空白・開き括弧類」の場合のみタグとみなす(文中の `C#` 等は無視)
-  - Markdown 見出し(`# ` のように # の直後が空白)・`##` の連続はタグとして扱わない
-  - コードブロック(``` ``` ```)・インラインコード内の `#` は無視する
-  - NFKC 正規化 + 小文字化で同一視(`#ToDo` と `#todo` は同じタグ、全角 `＃` も認識)
-  - 使用可能文字: 英数字・`_`・`-`・漢字・ひらがな・カタカナ・長音符
+## コントリビューション
 
-#### タグパネル(左サイドバー)
-- 全メモのハッシュタグを件数付きチップで集約表示(件数降順)
-- チップをクリックすると、そのタグを含むメモだけに一覧を**絞り込み**(再クリックまたは「解除 ×」で解除)
-- 絞り込み中のタグが全メモから消えた場合は自動で解除される
-- メモ一覧の各項目にも、そのメモが持つタグを最大3件表示
+バグ報告・機能提案・プルリクエストを歓迎します。開発環境のセットアップ手順や PR の出し方は
+[CONTRIBUTING.md](./CONTRIBUTING.md) を参照してください。
 
-#### タグによる繋がりの可視化(レコメンド強化)
-- レコメンド検索時に、編集中メモと候補メモの**共通タグ**(`sharedTags`)を算出
-- 関連メモカードにバイオレットの `#タグ` チップとして表示し、キーワード一致(インディゴ)と色で区別
-- 最小表示のスリム項目でも `#タグ +n` バッジで繋がりを示す
+## ライセンス
 
-#### キーワードタブの優先度・並び順
-- 以下の優先順位でソートして表示する(`electron/search.js` の `keywordSearch()`):
-  - **第1優先**: 同じハッシュタグが一致するメモ(一致タグ数が多いほど上位。タグさえ一致すればキーワードが不一致でも候補に含める)
-  - **第2優先**: 一般キーワード(特徴語)のみが一致するメモ(従来のキーワードスコア順)
-- 実装は合成スコア方式: `一致タグ数 × (キーワード最高点 + 1) + キーワード点`
-  (「タグ1件の一致はどんなキーワード一致より強い」と定義し、スコアバー表示も順位と整合する)
-- UI 上の区別: リストの境界に「**# タグ一致**」「**キーワード一致**」の小見出しを挿入し、
-  タグ一致カードは薄いバイオレットの枠 + `#タグ` チップでさりげなく区別する
-
-### ④ サイドバーのリサイズ・開閉
-
-#### リサイズ(ドラッグ)
-- 左右サイドバーの境界線にホバーするとカーソルが左右矢印(col-resize)に変化し、境界線がインディゴに発光する
-- ドラッグで幅を滑らかに変更できる(ドラッグ中はアニメーションを無効化して追従)
-- 幅の制限: 左パネル **200〜400px**(既定 256px) / 右パネル **240〜480px**(既定 320px)
-- 境界線のダブルクリックで既定の幅にリセット
-
-#### 開閉(トグル)
-- 開閉手段は3つ:
-  - 境界線中央のシェブロンボタン(展開中はホバー時のみ表示、折りたたみ中は常時表示)
-  - フローティングツールバー両端のパネルアイコン(開いている側が塗りで表示される)
-  - ショートカット: `Ctrl+B`(左) / `Ctrl+Shift+B`(右)
-- 300ms のスライドアニメーションで開閉し、折りたたみ中も直前の幅を保持して再展開時に復元する
-
-#### 状態の永続化
-- 幅・開閉状態は `localStorage`(`zk:panel:left` / `zk:panel:right`)に保存され、
-  アプリを再起動してもレイアウトが維持される(`useResizablePanel` フック)
-
-## ステップ2への拡張ポイント
-
-- `electron/search.js` の `vectorSearch()` をローカル埋め込みモデルに差し替え
-  (埋め込みは保存時に計算して DB にキャッシュする設計を推奨)
-- メモ間リンク(`[[リンク]]` 記法)とグラフビュー
-- 全文検索 UI・エクスポート機能
-- タグの拡張(タグの複数選択絞り込み・タグのリネーム・エディタ内ハイライト)
+[MIT License](./LICENSE) の下で公開しています。
