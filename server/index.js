@@ -271,9 +271,22 @@ app.put(
 // Web アプリを同一オリジン・単一コンテナで提供できる(CORS も不要になる)
 const webDist = path.join(__dirname, '..', 'web', 'dist');
 if (fs.existsSync(webDist)) {
-  app.use(express.static(webDist));
+  app.use(
+    express.static(webDist, {
+      setHeaders: (res, filePath) => {
+        // Service Worker 本体(と HTML)は必ず再検証させる。
+        // ここがブラウザにキャッシュされたままだと、Workbox 側の
+        // 世代管理が正しくても新しい SW への切り替わりが遅れる
+        // (「更新したのに反映されない」の典型的な原因のひとつ)
+        if (filePath.endsWith('sw.js') || filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    })
+  );
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api/')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
     res.sendFile(path.join(webDist, 'index.html'));
   });
 }
