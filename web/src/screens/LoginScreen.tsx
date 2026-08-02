@@ -4,6 +4,7 @@
 // ============================================================
 import { useState } from 'react';
 import { api, ApiError } from '../lib/apiClient';
+import SecretInput from '../components/SecretInput';
 
 export interface Auth {
   token: string;
@@ -98,12 +99,7 @@ export default function LoginScreen({
             <span className="mb-1 block text-[11px] font-medium text-slate-400">
               パスワード
             </span>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className={inputCls}
-            />
+            <SecretInput value={password} onChange={setPassword} className={inputCls} />
           </label>
 
           {error && (

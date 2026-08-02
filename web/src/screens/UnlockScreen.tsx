@@ -14,6 +14,7 @@
 import { useState } from 'react';
 import { api, ApiError } from '../lib/apiClient';
 import { deriveKey, generateSalt, makeKeyCheck, verifyKeyCheck } from '../lib/webCrypto';
+import SecretInput from '../components/SecretInput';
 
 export default function UnlockScreen({
   token,
@@ -70,10 +71,9 @@ export default function UnlockScreen({
             void unlock();
           }}
         >
-          <input
-            type="password"
+          <SecretInput
             value={passphrase}
-            onChange={(e) => setPassphrase(e.target.value)}
+            onChange={setPassphrase}
             placeholder="暗号化キー(パスフレーズ)"
             autoFocus
             className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-slate-200 ring-1 ring-white/10 outline-none transition-shadow placeholder:text-slate-600 focus:ring-indigo-400/50"
