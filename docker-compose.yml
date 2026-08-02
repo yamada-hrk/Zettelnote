@@ -1,5 +1,5 @@
 # ============================================================
-# Step2: 同期バックエンド(API サーバー + PostgreSQL)
+# Step2: 同期バックエンド(API サーバー + PostgreSQL + Web版アプリ)
 #   起動:   docker compose up -d --build
 #   停止:   docker compose down        (データは volume に保持)
 #   破棄:   docker compose down -v     (サーバー側データも削除)
@@ -7,10 +7,17 @@
 # サーバーにはクライアント側で暗号化済みのデータのみが保存される
 # (ゼロ知識: サーバーは暗号化キーを一切持たない)
 # 認証はアカウント制(アプリ内から新規登録 / ログイン)
+#
+# api イメージは Web版アプリ(web/)も同梱してビルドする
+# (server/Dockerfile が electron/・src/hooks/ の共有ロジックも
+# 参照するため、ビルドコンテキストはリポジトリルートにしている)
+# 起動後は http://localhost:8787/ で Web版に直接アクセスできる
 # ============================================================
 services:
   api:
-    build: ./server
+    build:
+      context: .
+      dockerfile: server/Dockerfile
     ports:
       - "8787:8787"
     environment:

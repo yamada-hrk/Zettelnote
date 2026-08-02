@@ -20,9 +20,21 @@
 //   クライアントが付与した updated_ms が新しい方を採用する。
 //   Pull の差分カーソルにはサーバー側の受信時刻(server_ms)を使う
 //   (クライアント間の時計ずれの影響を受けないようにするため)。
+//
+// ■ Web版クライアントへの対応
+//   Web版はブラウザから直接この API を叩く(クロスオリジンになり得る)ため
+//   CORS を有効化している。認証は Cookie ではなく Bearer トークンなので
+//   CSRF の懸念がなく、オリジンをオープンにしても安全性は損なわれない
+//   (自己ホスト前提の個人利用サーバーであることも踏まえた判断)。
+//   ビルド済みの Web アプリ(web/dist)が存在する場合は、このサーバー
+//   自身が静的ファイルとして配信する(同一オリジンになるため本番では
+//   実質 CORS は不要になるが、開発時の Vite dev server 用に残している)
 // ============================================================
+const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
+const cors = require('cors');
 const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 
@@ -30,6 +42,7 @@ const PORT = Number(process.env.PORT || 8787);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const app = express();
+app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
 /** 非同期ハンドラのエラーを error handler へ流すラッパー(next も転送する) */
@@ -252,6 +265,31 @@ app.put(
     res.json({ serverNow: now, applied });
   })
 );
+
+// ---- Web版アプリの配信(web/dist をビルドしてあれば静的配信する) ----
+// Docker イメージ内では web/dist を同梱するため、API サーバーと
+// Web アプリを同一オリジン・単一コンテナで提供できる(CORS も不要になる)
+const webDist = path.join(__dirname, '..', 'web', 'dist');
+if (fs.existsSync(webDist)) {
+  app.use(
+    express.static(webDist, {
+      setHeaders: (res, filePath) => {
+        // Service Worker 本体(と HTML)は必ず再検証させる。
+        // ここがブラウザにキャッシュされたままだと、Workbox 側の
+        // 世代管理が正しくても新しい SW への切り替わりが遅れる
+        // (「更新したのに反映されない」の典型的な原因のひとつ)
+        if (filePath.endsWith('sw.js') || filePath.endsWith('index.html')) {
+          res.setHeader('Cache-Control', 'no-cache');
+        }
+      },
+    })
+  );
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api/')) return next();
+    res.setHeader('Cache-Control', 'no-cache');
+    res.sendFile(path.join(webDist, 'index.html'));
+  });
+}
 
 // ---- エラーハンドラ ----
 // eslint-disable-next-line no-unused-vars

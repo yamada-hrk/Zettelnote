@@ -21,6 +21,9 @@ function createWindow() {
     minWidth: 1000,
     minHeight: 600,
     title: 'ローカル・ツェッテルカステン',
+    // タイトルバー/タスクバーのアイコン(パッケージ版の実行ファイル
+    // アイコンは electron-builder.yml の win.icon で別途指定している)
+    icon: path.join(__dirname, '..', 'build', 'icon.png'),
     webPreferences: {
       // セキュリティ: レンダラーには preload 経由の API のみ公開する
       preload: path.join(__dirname, 'preload.js'),

@@ -1,0 +1,11 @@
+# server/Dockerfile のビルドコンテキストがリポジトリルートになったため、
+# ルートに .dockerignore を置いて不要なファイルを除外する
+node_modules
+**/node_modules
+dist
+**/dist
+release
+.git
+.claude
+tmp
+*.tmp.js
