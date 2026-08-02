@@ -1,6 +1,6 @@
 {
   "name": "zettelkasten-local",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "ローカル完結型ツェッテルカステン・メモアプリ（ステップ1プロトタイプ）",
   "private": true,
   "license": "MIT",
