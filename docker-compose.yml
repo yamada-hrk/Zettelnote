@@ -12,6 +12,12 @@
 # (server/Dockerfile が electron/・src/hooks/ の共有ロジックも
 # 参照するため、ビルドコンテキストはリポジトリルートにしている)
 # 起動後は http://localhost:8787/ で Web版に直接アクセスできる
+#
+# 外部公開(zettelnote.hol-tec.net)とLet's EncryptによるTLS終端は、
+# このホスト上で稼働中のk3s(Traefik + cert-manager)側のIngressで
+# 行う。設定は k8s/ ディレクトリ、または deploy時の kubectl 適用を参照。
+# (ホストの80/443番はTraefikが既に専有しているため、docker-compose
+#  側では8787番をホストへ公開するだけに留める)
 # ============================================================
 services:
   api:
