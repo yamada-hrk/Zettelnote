@@ -9,11 +9,7 @@
 // v1 スコープ: デスクトップ版のような順位ごとの情報量グラデーション
 // (リッチ/コンパクト/スリムの3段階)やホバー演出は簡略化している
 // ============================================================
-import { useEffect, useState } from 'react';
-import { vectorSearch, keywordSearch, extractTags } from './lib/search';
-import type { RecommendItem } from './types';
-
-type Mode = 'vector' | 'keyword';
+import { useRecommend } from './hooks/useRecommend';
 
 export default function RecommendPanel({
   width,
@@ -31,52 +27,9 @@ export default function RecommendPanel({
   docs: { uid: string; title: string; body: string }[];
   onOpen: (uid: string) => void;
 }) {
-  const [mode, setMode] = useState<Mode>('vector');
-  const [results, setResults] = useState<{
-    vector: RecommendItem[];
-    keyword: RecommendItem[];
-  }>({
-    vector: [],
-    keyword: [],
-  });
+  const { mode, setMode, items } = useRecommend(queryText, excludeUid, docs);
 
   const queryMode = excludeUid === null && queryText.trim().length > 0;
-
-  // vectorSearch/keywordSearch はブラウザのメインスレッドで完結する同期処理
-  // (バイグラムTF-IDF)のため、IPC 越しに計算するデスクトップ版と異なり
-  // 待機インジケーターは持たない(体感できるほどの遅延が発生しないため)。
-  // デバウンスは呼び出し元(NotesApp)の debouncedRecommendText 側で行う
-  useEffect(() => {
-    const text = queryText.trim();
-    if (!text) {
-      setResults({ vector: [], keyword: [] });
-      return;
-    }
-    const targets = docs
-      .filter((d) => d.uid !== excludeUid)
-      .map((d) => ({ id: d.uid, title: d.title, body: d.body }));
-
-    // 編集中メモ(またはクエリ)と各候補メモの共通タグを算出する
-    // (キーワード検索はタグ優先ソートのため search.js 内部で算出済みだが、
-    // ベクトル検索の結果には無いため、ここで両タブ共通に付与している。
-    // デスクトップ版 main.js の withSharedTags() と同じロジック)
-    const queryTags = extractTags(text);
-    const docTags = new Map(docs.map((d) => [d.uid, extractTags(d.body)]));
-    const withSharedTags = (items: RecommendItem[]) =>
-      items.map((item) => ({
-        ...item,
-        sharedTags: queryTags.filter((t) =>
-          (docTags.get(item.uid) ?? []).includes(t),
-        ),
-      }));
-
-    setResults({
-      vector: withSharedTags(vectorSearch(text, targets, 10)),
-      keyword: withSharedTags(keywordSearch(text, targets, 10)),
-    });
-  }, [queryText, excludeUid, docs]);
-
-  const items = mode === 'vector' ? results.vector : results.keyword;
 
   return (
     <aside

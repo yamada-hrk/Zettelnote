@@ -21,6 +21,7 @@ import { useIsMobile } from './hooks/useIsMobile';
 import { useNotesStore } from './lib/notesStore';
 import { extractTags, keywordFilter } from './lib/search';
 import RecommendPanel from './RecommendPanel';
+import MobileRecommendStrip from './MobileRecommendStrip';
 import PanelHandle from './components/PanelHandle';
 import type { Note } from './types';
 
@@ -66,10 +67,10 @@ export default function NotesApp({
   });
   // スマホ幅では3カラムを同時表示せず、単一ペインを切り替える
   // (デスクトップ版の挙動には一切影響しない追加レイヤー)
+  // 関連メモは別画面ではなく編集/プレビュー画面下部の帯パネル
+  // (MobileRecommendStrip)に常駐させているため list/editor の2状態のみ
   const isMobile = useIsMobile();
-  const [mobileView, setMobileView] = useState<'list' | 'editor' | 'related'>(
-    'list',
-  );
+  const [mobileView, setMobileView] = useState<'list' | 'editor'>('list');
 
   // カードグリッド(俯瞰モード)は幅に応じた自動切替のためスマホの
   // 単一ペイン全幅表示とは相性が悪い(常に閾値を超えてしまう)ので無効化する
@@ -219,7 +220,8 @@ export default function NotesApp({
   // (幅を伴うリサイズ・折りたたみ・カードグリッド化はデスクトップ限定の概念のため無効化)
   const showListPane = !isMobile || mobileView === 'list';
   const showEditorPane = !isMobile || mobileView === 'editor';
-  const showRelatedPane = !isMobile || mobileView === 'related';
+  // 関連メモのサイドバーはデスクトップ限定(スマホは編集画面下部の帯パネル)
+  const showRelatedPane = !isMobile;
 
   return (
     <div className={isMobile ? 'flex h-full flex-col' : 'flex h-full'}>
@@ -471,15 +473,6 @@ export default function NotesApp({
                       : ''}
                 </span>
                 <div className="flex-1" />
-                {/* スマホ表示: 関連メモパネルを全画面で開くボタン */}
-                {isMobile && (
-                  <button
-                    onClick={() => setMobileView('related')}
-                    className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
-                  >
-                    🔗 関連
-                  </button>
-                )}
                 <button
                   onClick={() => void handleDelete()}
                   className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
@@ -514,6 +507,15 @@ export default function NotesApp({
                   spellCheck={false}
                 />
               )}
+              {/* スマホ表示: 意味的類似/キーワードの一覧を画面下部に常駐表示 */}
+              {isMobile && (
+                <MobileRecommendStrip
+                  queryText={debouncedRecommendText}
+                  excludeUid={recommendExcludeUid}
+                  docs={recommendDocs}
+                  onOpen={(uid) => selectNote(uid, true)}
+                />
+              )}
             </>
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
@@ -535,41 +537,21 @@ export default function NotesApp({
         />
       )}
 
-      {/* 右: 関連メモ(意味的類似 / キーワード) */}
+      {/* 右: 関連メモ(意味的類似 / キーワード。デスクトップのみ。
+          スマホは編集/プレビュー画面下部の MobileRecommendStrip が代役) */}
       {showRelatedPane && (
         <div
-          className={
-            isMobile
-              ? 'flex h-full w-full flex-col overflow-hidden'
-              : 'flex shrink-0 overflow-hidden'
-          }
-          style={
-            isMobile
-              ? undefined
-              : {
-                  width: rightPanel.collapsed ? 0 : rightPanel.width,
-                  transition: rightPanel.resizing
-                    ? 'none'
-                    : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
-                }
-          }
+          className="flex shrink-0 overflow-hidden"
+          style={{
+            width: rightPanel.collapsed ? 0 : rightPanel.width,
+            transition: rightPanel.resizing
+              ? 'none'
+              : 'width 300ms cubic-bezier(0.4, 0, 0.2, 1)',
+          }}
         >
-          {isMobile && (
-            <div className="flex shrink-0 items-center gap-3 border-b border-white/5 px-5 py-2">
-              <button
-                onClick={() => setMobileView('editor')}
-                className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/5 px-2.5 text-xs font-medium text-slate-300 ring-1 ring-white/5 transition-colors hover:bg-white/10 hover:text-slate-100"
-              >
-                <ChevronIcon direction="left" /> エディタに戻る
-              </button>
-            </div>
-          )}
-          {/* min-h-0 がないと RecommendPanel 内部の h-full が親のフレックス
-            残り領域ではなく祖先の高さ全体を基準にしてしまい、モバイル表示で
-            戻るボタンの分だけ下端がはみ出す */}
           <div className="min-h-0 flex-1">
             <RecommendPanel
-              width={isMobile ? '100%' : rightPanel.width}
+              width={rightPanel.width}
               queryText={debouncedRecommendText}
               excludeUid={recommendExcludeUid}
               docs={recommendDocs}
