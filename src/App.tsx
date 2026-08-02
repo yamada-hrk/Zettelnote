@@ -44,7 +44,10 @@ export default function App() {
     storageKey: 'zk:panel:left',
     defaultWidth: 256,
     minWidth: 200,
-    maxWidth: 400,
+    // 400px から拡張: 380px 超で ScrapBox 風カード表示(俯瞰モード)に
+    // 切り替わるため、複数カラムのグリッドが組めるだけの余白を確保する
+    // (ウィンドウ最小幅 1000px との兼ね合いで 640px を上限にしている)
+    maxWidth: 640,
     side: 'left',
   });
   const rightPanel = useResizablePanel({
@@ -76,6 +79,45 @@ export default function App() {
       (a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja')
     );
   }, [notes]);
+
+  // ---- 俯瞰モード(カード表示)用の付加情報 ----
+
+  /**
+   * ハッシュタグを共有する他メモの件数(俯瞰モードのカードに「🔗 繋がり」として表示)
+   * タグ→メモID の索引を1回作ってから数えるため、メモ数が多くても軽い
+   */
+  const connectionCounts = useMemo(() => {
+    const byTag = new Map<string, number[]>();
+    for (const n of notes) {
+      for (const t of n.tags) {
+        const ids = byTag.get(t);
+        if (ids) ids.push(n.id);
+        else byTag.set(t, [n.id]);
+      }
+    }
+    const counts = new Map<number, number>();
+    for (const n of notes) {
+      const linked = new Set<number>();
+      for (const t of n.tags) {
+        for (const id of byTag.get(t) ?? []) {
+          if (id !== n.id) linked.add(id);
+        }
+      }
+      counts.set(n.id, linked.size);
+    }
+    return counts;
+  }, [notes]);
+
+  /**
+   * 編集中メモとの AI 連想スコア(俯瞰モードのカードに関連度として表示)
+   * 既存のレコメンド結果(ベクトル検索)をそのまま流用するため追加の検索は発生しない。
+   * メモ未選択・検索中は空になる(表示するべき「基準点」がないため)
+   */
+  const relevanceById = useMemo(() => {
+    const map = new Map<number, number>();
+    for (const item of recommend.vector) map.set(item.id, item.score);
+    return map;
+  }, [recommend.vector]);
 
   /** 検索・タグ絞り込み後の一覧(検索中は検索結果を母集合にする) */
   const visibleNotes = useMemo(() => {
@@ -427,6 +469,8 @@ export default function App() {
           currentId={currentId}
           searchQuery={searchQuery}
           searchActive={searchResults !== null}
+          connectionCounts={connectionCounts}
+          relevanceById={relevanceById}
           onSearchChange={setSearchQuery}
           onSelect={handleSelect}
           onCreate={handleCreate}
