@@ -2,9 +2,12 @@
 // 暗号化キー入力画面(Web版)
 //
 // アカウントへのログイン(パスワード)とは別に、メモを復号するための
-// 暗号化キー(パスフレーズ)をここで入力する。パスフレーズは
-// ブラウザに保存しない(desktop版の safeStorage に相当する安全な
-// 保存手段がブラウザには無いため、毎セッション入力を求める設計)。
+// 暗号化キー(パスフレーズ)をここで入力する。
+//
+// 「このブラウザに保存する」を選ぶと、導出した鍵(非extractable
+// CryptoKey)を IndexedDB に保存し、次回以降このアンロック画面を
+// スキップできる。保存しない場合は毎セッション再入力が必要
+// (トレードオフの詳細は仕様書 §11 参照)。
 //
 // electron/sync.js の configure() と同じロジック:
 //   1. サーバーの鍵導出メタ(salt/keyCheck)を取得
@@ -14,6 +17,7 @@
 import { useState } from 'react';
 import { api, ApiError } from '../lib/apiClient';
 import { deriveKey, generateSalt, makeKeyCheck, verifyKeyCheck } from '../lib/webCrypto';
+import { saveKey } from '../lib/keyStore';
 import SecretInput from '../components/SecretInput';
 
 export default function UnlockScreen({
@@ -28,6 +32,7 @@ export default function UnlockScreen({
   onLogout: () => void;
 }) {
   const [passphrase, setPassphrase] = useState('');
+  const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,6 +52,7 @@ export default function UnlockScreen({
       if (!(await verifyKeyCheck(key, meta.keyCheck))) {
         throw new ApiError('暗号化キーが一致しません(このアカウントの既存データと異なるキーです)');
       }
+      if (remember) await saveKey(username, key);
       onUnlocked(key);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'サーバーに接続できません');
@@ -61,7 +67,6 @@ export default function UnlockScreen({
         <h1 className="text-sm font-bold text-slate-200">🔐 暗号化キーの入力</h1>
         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
           @{username} としてログイン中。メモを復号するための暗号化キーを入力してください。
-          このキーはブラウザに保存されません(セッションごとに再入力が必要です)。
         </p>
 
         <form
@@ -78,6 +83,19 @@ export default function UnlockScreen({
             autoFocus
             className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-slate-200 ring-1 ring-white/10 outline-none transition-shadow placeholder:text-slate-600 focus:ring-indigo-400/50"
           />
+
+          <label className="flex items-start gap-2 px-0.5 text-[11px] text-slate-400">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="mt-0.5 accent-indigo-500"
+            />
+            <span>
+              このブラウザに保存する(次回から入力不要になります。共有・公共の端末では
+              チェックを外してください)
+            </span>
+          </label>
 
           {error && (
             <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-400 ring-1 ring-red-500/20">

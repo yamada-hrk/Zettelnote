@@ -18,11 +18,14 @@ export default function NotesApp({
   username,
   cryptoKey,
   onLogout,
+  onForgetKey,
 }: {
   token: string;
   username: string;
   cryptoKey: CryptoKey;
   onLogout: () => void;
+  /** アカウントはログインしたまま、保存済み暗号化キーだけ削除して再入力を求める */
+  onForgetKey: () => void;
 }) {
   const { notes, loading, error, save, remove, create } = useNotesStore(token, cryptoKey);
 
@@ -164,7 +167,14 @@ export default function NotesApp({
           </ul>
         </nav>
 
-        <div className="border-t border-white/5 px-3 py-2">
+        <div className="space-y-0.5 border-t border-white/5 px-3 py-2">
+          <button
+            onClick={onForgetKey}
+            title="このブラウザに保存した暗号化キーを削除し、次回アンロック画面で再入力を求めます"
+            className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
+          >
+            🔒 キーの記憶を削除
+          </button>
           <button
             onClick={onLogout}
             className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
