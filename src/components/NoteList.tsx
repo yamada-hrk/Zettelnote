@@ -12,13 +12,18 @@ import type { NoteMeta } from '../types';
 interface Props {
   /** パネルの幅(px)。リサイズ対応のため親から渡される */
   width: number;
-  /** 表示するメモ(タグ絞り込み適用済み) */
+  /** 表示するメモ(検索・タグ絞り込み適用済み) */
   notes: NoteMeta[];
   /** 全メモのタグ集計: [タグ名, 件数](件数降順) */
   tags: [string, number][];
   /** 現在絞り込み中のタグ(null なら全件表示) */
   tagFilter: string | null;
   currentId: number | null;
+  /** 検索クエリ(入力中の生の値) */
+  searchQuery: string;
+  /** 検索結果表示中か(件数表示・空状態の文言に使う) */
+  searchActive: boolean;
+  onSearchChange: (query: string) => void;
   onSelect: (id: number) => void;
   onCreate: () => void;
   /** タグの選択/解除(null で解除) */
@@ -31,6 +36,9 @@ export default function NoteList({
   tags,
   tagFilter,
   currentId,
+  searchQuery,
+  searchActive,
+  onSearchChange,
   onSelect,
   onCreate,
   onSelectTag,
@@ -52,13 +60,54 @@ export default function NoteList({
       </div>
 
       {/* 新規作成ボタン */}
-      <div className="px-3 py-3">
+      <div className="px-3 pt-3 pb-2">
         <button
           onClick={onCreate}
           className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 hover:from-indigo-400 hover:to-indigo-500 active:scale-[0.98]"
         >
           ＋ 新規メモ
         </button>
+      </div>
+
+      {/* 検索バー: 打鍵で一覧を即絞り込み、右ペインは AI 連想結果に切り替わる */}
+      <div className="px-3 pb-2">
+        <div className="relative">
+          <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+            🔍
+          </span>
+          <input
+            id="note-search-input"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            onKeyDown={(e) => {
+              // Esc で検索を解除してフォーカスを外す
+              if (e.key === 'Escape') {
+                onSearchChange('');
+                e.currentTarget.blur();
+              }
+            }}
+            placeholder="検索 (Ctrl+K)"
+            className="w-full rounded-lg bg-white/5 py-1.5 pl-8 pr-7 text-sm text-slate-200 ring-1 ring-white/10 outline-none transition-shadow placeholder:text-slate-600 focus:ring-indigo-400/50"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => onSearchChange('')}
+              title="検索を解除 (Esc)"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded px-1 text-xs text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-200"
+            >
+              ✕
+            </button>
+          )}
+        </div>
+        {/* 検索中は件数を表示 */}
+        {searchActive && (
+          <p className="mt-1.5 px-1 text-[10px] text-slate-500">
+            一致 {notes.length} 件
+            {tagFilter && (
+              <span className="text-indigo-300/70">(#{tagFilter} 内)</span>
+            )}
+          </p>
+        )}
       </div>
 
       {/* タグパネル */}
@@ -111,7 +160,14 @@ export default function NoteList({
       <nav className="thin-scrollbar flex-1 overflow-y-auto px-2 pb-3 pt-2">
         {notes.length === 0 && (
           <p className="px-3 py-6 text-center text-xs leading-relaxed text-slate-500">
-            {tagFilter ? (
+            {searchActive ? (
+              <>
+                「<span className="text-slate-300">{searchQuery.trim()}</span>」
+                に一致するメモはありません。
+                <br />
+                右の連想結果もあわせて確認してください。
+              </>
+            ) : tagFilter ? (
               <>
                 <span className="text-indigo-300">#{tagFilter}</span>{' '}
                 のメモはありません。

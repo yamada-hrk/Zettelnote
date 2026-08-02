@@ -214,6 +214,23 @@ function keywordSearch(queryText, docs, topK) {
   }));
 }
 
+/**
+ * キーワード検索(左ペインの絞り込み用・部分一致フィルタ)
+ * 空白区切りの複数語は「すべて含む」メモのみ返す(AND 条件)。
+ * normalize によりひらがな/カタカナ以外の全半角・大文字小文字の揺れを吸収する。
+ * @param {string} query 検索クエリ
+ * @param {{id:number,title:string,body:string}[]} docs 検索対象メモ
+ * @returns docs の順序(更新日時降順)を保った部分配列
+ */
+function keywordFilter(query, docs) {
+  const terms = normalize(query).split(' ').filter(Boolean);
+  if (terms.length === 0) return [];
+  return docs.filter((d) => {
+    const text = normalize(`${d.title}\n${d.body}`);
+    return terms.every((t) => text.includes(t));
+  });
+}
+
 /** 部分文字列の出現回数を数える */
 function countOccurrences(haystack, needle) {
   if (!needle) return 0;
@@ -244,4 +261,4 @@ function makeExcerpt(body, aroundTerm = null, length = 90) {
   return plain.slice(0, length) + (plain.length > length ? '…' : '');
 }
 
-module.exports = { vectorSearch, keywordSearch };
+module.exports = { vectorSearch, keywordSearch, keywordFilter };

@@ -55,6 +55,14 @@ export default function App() {
     side: 'right',
   });
 
+  // ---- 検索(左ペイン: キーワード絞り込み / 右ペイン: AI 連想) ----
+  const [searchQuery, setSearchQuery] = useState('');
+  /** 検索結果(null = 検索していない = 通常一覧を表示) */
+  const [searchResults, setSearchResults] = useState<NoteMeta[] | null>(null);
+  // 左の絞り込みは軽いので 150ms、右の連想検索は重いので 500ms で追従させる
+  const debouncedQueryFilter = useDebounce(searchQuery, 150);
+  const debouncedQueryAi = useDebounce(searchQuery, 500);
+
   // ---- ハッシュタグ絞り込み ----
   const [tagFilter, setTagFilter] = useState<string | null>(null);
 
@@ -69,11 +77,11 @@ export default function App() {
     );
   }, [notes]);
 
-  /** タグ絞り込み後の一覧(未選択なら全件) */
-  const visibleNotes = useMemo(
-    () => (tagFilter ? notes.filter((n) => n.tags.includes(tagFilter)) : notes),
-    [notes, tagFilter]
-  );
+  /** 検索・タグ絞り込み後の一覧(検索中は検索結果を母集合にする) */
+  const visibleNotes = useMemo(() => {
+    const base = searchResults ?? notes;
+    return tagFilter ? base.filter((n) => n.tags.includes(tagFilter)) : base;
+  }, [notes, searchResults, tagFilter]);
 
   /** タグの選択/解除(同じタグを再クリックで解除) */
   const handleSelectTag = useCallback((tag: string | null) => {
@@ -152,9 +160,31 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedForSave]);
 
-  // ---- レコメンド検索(デバウンス後・バックグラウンド実行) ----
+  // ---- 左ペインのキーワード絞り込み(デバウンス後・部分一致) ----
   useEffect(() => {
-    const text = `${debouncedForSearch.title}\n${debouncedForSearch.body}`;
+    const q = debouncedQueryFilter.trim();
+    if (!q) {
+      setSearchResults(null); // 検索解除 → 通常一覧へ
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const results = await window.api.searchNotes(q);
+      if (!cancelled) setSearchResults(results);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // notes を依存に含める: 保存・同期でメモが変わったら検索結果も追従させる
+  }, [debouncedQueryFilter, notes]);
+
+  // ---- 右ペインのレコメンド / AI 連想検索(デバウンス後・バックグラウンド実行) ----
+  // 検索クエリが入力されている間は「編集中メモ」ではなく「クエリ」を起点に連想する
+  useEffect(() => {
+    const queryMode = debouncedQueryAi.trim().length > 0;
+    const text = queryMode
+      ? debouncedQueryAi.trim()
+      : `${debouncedForSearch.title}\n${debouncedForSearch.body}`;
     if (!text.trim()) {
       setRecommend({ vector: [], keyword: [] });
       return;
@@ -163,7 +193,8 @@ export default function App() {
     (async () => {
       setSearching(true);
       const result = await window.api.recommend({
-        excludeId: currentId,
+        // クエリ検索時は開いているメモ自身もヒット対象に含める
+        excludeId: queryMode ? null : currentId,
         text,
       });
       // 古い検索結果で新しい結果を上書きしない
@@ -176,7 +207,7 @@ export default function App() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedForSearch, currentId]);
+  }, [debouncedForSearch, debouncedQueryAi, currentId]);
 
   // ---- 各操作ハンドラ ----
 
@@ -300,6 +331,36 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [leftPanel.toggle, rightPanel.toggle]);
 
+  // ---- キーボードショートカット: Ctrl+K で検索バーへフォーカス ----
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
+      if (e.key.toLowerCase() !== 'k') return;
+      e.preventDefault();
+      const focusInput = () =>
+        document.getElementById('note-search-input')?.focus();
+      if (leftPanel.collapsed) {
+        // 左ペインが閉じていたら開いてから(スライド完了後に)フォーカス
+        leftPanel.toggle();
+        setTimeout(focusInput, 350);
+      } else {
+        focusInput();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [leftPanel.collapsed, leftPanel.toggle]);
+
+  // ---- 検索開始時: 右ペイン(連想結果)が閉じていたら自動で開く ----
+  const prevSearchActiveRef = useRef(false);
+  useEffect(() => {
+    const active = searchQuery.trim().length > 0;
+    if (active && !prevSearchActiveRef.current && rightPanel.collapsed) {
+      rightPanel.toggle();
+    }
+    prevSearchActiveRef.current = active;
+  }, [searchQuery, rightPanel.collapsed, rightPanel.toggle]);
+
   /** 現在のメモを削除する */
   const handleDelete = useCallback(async () => {
     if (currentId === null) return;
@@ -364,6 +425,9 @@ export default function App() {
           tags={tagCounts}
           tagFilter={tagFilter}
           currentId={currentId}
+          searchQuery={searchQuery}
+          searchActive={searchResults !== null}
+          onSearchChange={setSearchQuery}
           onSelect={handleSelect}
           onCreate={handleCreate}
           onSelectTag={handleSelectTag}
@@ -426,6 +490,7 @@ export default function App() {
           width={rightPanel.width}
           result={recommend}
           searching={searching}
+          searchQuery={searchQuery.trim()}
           onOpen={handleSelect}
         />
       </div>

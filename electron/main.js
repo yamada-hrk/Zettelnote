@@ -71,14 +71,21 @@ app.on('window-all-closed', () => {
 // IPC ハンドラ登録
 // ------------------------------------------------------------
 function registerIpcHandlers() {
+  /** 本文込みの行 → 一覧用メタ情報(プレビュー + タグ)に整形する */
+  const toMeta = ({ body, ...meta }) => ({
+    ...meta,
+    preview: body.slice(0, 60),
+    tags: extractTags(body),
+  });
+
   // メモ一覧(メタ情報 + 本文から抽出したハッシュタグ)
-  ipcMain.handle('notes:list', () =>
-    db.listNotesWithBody().map(({ body, ...meta }) => ({
-      ...meta,
-      preview: body.slice(0, 60),
-      tags: extractTags(body),
-    }))
-  );
+  ipcMain.handle('notes:list', () => db.listNotesWithBody().map(toMeta));
+
+  // キーワード検索(左ペインの絞り込み。部分一致・複数語 AND)
+  ipcMain.handle('notes:search', (_e, query) => {
+    if (!query || !query.trim()) return [];
+    return search.keywordFilter(query, db.listNotesWithBody()).map(toMeta);
+  });
 
   // メモ1件取得
   ipcMain.handle('notes:get', (_e, id) => db.getNote(id));

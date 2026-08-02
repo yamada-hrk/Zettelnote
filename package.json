@@ -1,6 +1,6 @@
 {
   "name": "zettelkasten-local",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "ローカル完結型ツェッテルカステン・メモアプリ（ステップ1プロトタイプ）",
   "private": true,
   "main": "electron/main.js",

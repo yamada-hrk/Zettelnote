@@ -33,6 +33,11 @@ interface Props {
   width: number;
   result: RecommendResult;
   searching: boolean;
+  /**
+   * 検索クエリ(空でなければ「編集中メモ起点」ではなく
+   * 「クエリ起点の AI 連想結果」を表示していることを示す)
+   */
+  searchQuery: string;
   onOpen: (id: number) => void;
 }
 
@@ -40,10 +45,12 @@ export default function RecommendSidebar({
   width,
   result,
   searching,
+  searchQuery,
   onOpen,
 }: Props) {
   const [mode, setMode] = useState<RecommendMode>('vector');
   const items = mode === 'vector' ? result.vector : result.keyword;
+  const queryMode = searchQuery.length > 0;
 
   return (
     // 境界線は PanelHandle 側が描画するため、ここでは border を持たない
@@ -51,13 +58,24 @@ export default function RecommendSidebar({
       style={{ width }}
       className="flex h-full shrink-0 flex-col bg-white/[0.02] backdrop-blur-xl"
     >
-      {/* ヘッダー */}
+      {/* ヘッダー(検索中はクエリ起点の連想結果であることを明示する) */}
       <div className="border-b border-white/5 px-4 py-3.5">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-bold text-slate-200">🔗 関連メモ</h2>
+          <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-200">
+            {queryMode ? (
+              <>
+                ✨{' '}
+                <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
+                  「{searchQuery}」の連想結果
+                </span>
+              </>
+            ) : (
+              '🔗 関連メモ'
+            )}
+          </h2>
           {/* 検索中インジケーター(淡く発光) */}
           {searching && (
-            <span className="h-2 w-2 animate-pulse rounded-full bg-indigo-400 shadow-[0_0_8px] shadow-indigo-400/60" />
+            <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-indigo-400 shadow-[0_0_8px] shadow-indigo-400/60" />
           )}
         </div>
 
@@ -82,7 +100,9 @@ export default function RecommendSidebar({
           <p className="px-2 py-8 text-center text-xs leading-relaxed text-slate-500">
             {searching
               ? '検索中…'
-              : 'メモを書き始めると、ここに関連メモが表示されます。'}
+              : queryMode
+                ? 'このクエリに近いメモは見つかりませんでした。'
+                : 'メモを書き始めると、ここに関連メモが表示されます。'}
           </p>
         ) : (
           <ul className="space-y-1.5">

@@ -7,6 +7,7 @@ declare global {
   interface Window {
     api: {
       listNotes: () => Promise<NoteMeta[]>;
+      searchNotes: (query: string) => Promise<NoteMeta[]>;
       getNote: (id: number) => Promise<Note | null>;
       createNote: () => Promise<Note>;
       updateNote: (

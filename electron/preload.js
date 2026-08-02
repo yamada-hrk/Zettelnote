@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('api', {
   /** メモ一覧(メタ情報のみ)を取得 */
   listNotes: () => ipcRenderer.invoke('notes:list'),
 
+  /** キーワード検索(部分一致・複数語 AND)。一覧と同じメタ情報を返す */
+  searchNotes: (query) => ipcRenderer.invoke('notes:search', query),
+
   /** メモを1件取得 */
   getNote: (id) => ipcRenderer.invoke('notes:get', id),
 
