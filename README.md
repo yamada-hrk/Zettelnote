@@ -47,6 +47,7 @@ GitHub Actions が自動ビルド・公開します(詳細は [コード署名](
 | 検索 | 文字バイグラム TF-IDF + コサイン類似度(自前実装) | 「ネットワーク接続を一切必要としない」要件を厳守するため、モデルダウンロードが必要な埋め込みモデルは見送り。日本語を分かち書きなしで扱える文字バイグラム方式を採用。`electron/search.js` の `vectorSearch()` を差し替えるだけでローカル埋め込みモデル(例: multilingual-e5-small + ONNX Runtime)へ移行できる構造 |
 | 同期サーバー | Node.js / Express + PostgreSQL 16 | Docker Compose で一発起動。暗号化済みデータのみを保存するゼロ知識ストア |
 | パッケージング | electron-builder | Windows 向け NSIS インストーラーを生成。GitHub Actions で自動ビルド |
+| Web版 | Vite + React + TypeScript(別アプリ、`web/`) | 常にサーバーへログインするシンクライアント。`electron/search.js`・`tags.js` をデスクトップ版と直接共有(コピーではない) |
 
 ## ディレクトリ構成
 
@@ -61,6 +62,15 @@ Zettelkasten/
 │   ├── crypto.js            # クライアントサイド暗号化(scrypt + AES-256-GCM)
 │   └── sync.js               # サーバー同期エンジン(LWW 差分同期)
 ├── server/                  # 同期バックエンド(Express + PostgreSQL、Docker Compose で起動)
+│                            #   起動時に web/dist が存在すれば静的配信も兼ねる
+├── web/                     # Web版(デスクトップ版とは別の Vite+React アプリ)
+│   ├── src/lib/
+│   │   ├── search.ts        # electron/search.js・tags.js を直接 import して共有
+│   │   ├── webCrypto.ts     # Web Crypto 版暗号化(Node版とバイト互換)
+│   │   ├── apiClient.ts     # 同期サーバー API クライアント(fetch)
+│   │   └── notesStore.ts    # メモの取得・保存(サーバーが唯一の正)
+│   ├── src/screens/         # LoginScreen(登録/ログイン)・UnlockScreen(暗号化キー入力)
+│   └── scripts/             # デスクトップ版との暗号互換性・E2E動作の検証スクリプト
 ├── src/                     # レンダラー(React / TypeScript)
 │   ├── main.tsx             # エントリポイント
 │   ├── App.tsx              # 3カラムレイアウト・状態管理・自動保存・検索制御
@@ -132,6 +142,28 @@ docker compose down
 サーバー URL(`http://localhost:8787`)・アカウント名・パスワード・暗号化キーを設定してください。
 メモは**端末側で暗号化してから**送信され、サーバーには暗号文のみが保存されます。
 暗号化キーはサーバーに送信されず、パスワード(認証用)とも独立しています(詳細は仕様書 §5.8)。
+
+### Web版
+
+`docker compose up -d --build` を実行すると、API サーバーに加えて Web版アプリもビルドされ、
+同じコンテナから配信されます。ブラウザで `http://localhost:8787/` を開くだけで使えます。
+
+```powershell
+# Web版だけを開発モードで起動する場合(要: 別途 API サーバーが起動していること)
+cd web
+npm install
+npm run dev   # http://localhost:5174 (API へは /api 経由でプロキシ)
+```
+
+**デスクトップ版との違い**: Web版は**常にサーバーへのログインが必須**です(ローカルのみモードはありません)。
+また暗号化キーはブラウザに保存されないため、**開くたびに再入力**が必要です(デスクトップ版は Electron の
+`safeStorage` で安全に保存・自動復元しますが、ブラウザには同等の仕組みが無いための意図的な設計です)。
+
+**共有ソース**: `electron/search.js`・`tags.js`(検索・ハッシュタグ抽出ロジック)は Web版から
+直接 import しており、コピーではなく完全に同じファイルを使っています。暗号化(scrypt + AES-256-GCM)は
+Node の `crypto` と ブラウザの Web Crypto API でそれぞれ実装していますが、**同じアカウントのメモを
+デスクトップ版・Web版のどちらからでも復号できるようバイト互換性を検証済み**です
+(`web/scripts/verify-crypto-compat.mjs`)。
 
 ## コード署名(SignPath)
 
