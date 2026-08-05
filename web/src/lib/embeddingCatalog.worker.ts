@@ -30,13 +30,24 @@ interface Doc {
   body: string;
 }
 
-interface RequestMessage {
+interface SearchRequestMessage {
+  kind?: 'search';
   requestId: number;
   modelId: string;
   query: string;
   docs: Doc[];
   topK: number;
 }
+
+/** モデル切り替え時の一括再計算(4.4)。検索は行わずキャッシュを埋めるだけ */
+interface WarmCacheRequestMessage {
+  kind: 'warmCache';
+  requestId: number;
+  modelId: string;
+  docs: Doc[];
+}
+
+type RequestMessage = SearchRequestMessage | WarmCacheRequestMessage;
 
 const ctx = self as unknown as Worker;
 
@@ -77,10 +88,19 @@ function makeCacheAdapter(modelId: string) {
 }
 
 ctx.onmessage = async (e: MessageEvent<RequestMessage>) => {
-  const { requestId, modelId, query, docs, topK } = e.data;
-  const entry = (catalogImpl as any).getCatalogEntry(modelId);
-  const cache = entry.needsCache ? makeCacheAdapter(modelId) : undefined;
+  const msg = e.data;
+  const entry = (catalogImpl as any).getCatalogEntry(msg.modelId);
+  const cache = entry.needsCache ? makeCacheAdapter(msg.modelId) : undefined;
   const embedder = entry.needsEmbedder ? embed : undefined;
-  const result = await entry.vectorSearch(query, docs, topK, cache, embedder);
-  ctx.postMessage({ requestId, result });
+
+  if (msg.kind === 'warmCache') {
+    await entry.warmCache(msg.docs, cache, embedder, (done: number, total: number) => {
+      ctx.postMessage({ type: 'warmCacheProgress', requestId: msg.requestId, done, total });
+    });
+    ctx.postMessage({ type: 'warmCacheDone', requestId: msg.requestId });
+    return;
+  }
+
+  const result = await entry.vectorSearch(msg.query, msg.docs, msg.topK, cache, embedder);
+  ctx.postMessage({ requestId: msg.requestId, result });
 };

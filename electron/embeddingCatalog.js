@@ -76,21 +76,48 @@ async function mpnetVectorSearch(query, docs, topK, cache, embed) {
     .slice(0, topK);
 }
 
+/**
+ * モデル切り替え時の一括再計算(4.4)。docs全件の埋め込みを事前に
+ * 計算してキャッシュへ書き込む(検索は行わない)。cache.set() が
+ * 呼ばれるたびにWorker側からvectorComputed通知が飛ぶため、
+ * サーバーへの同期(vectorSync.ts)は既存の仕組みがそのまま使える。
+ * @param {(done: number, total: number) => void} onProgress
+ */
+async function mpnetWarmCache(docs, cache, embed, onProgress) {
+  let done = 0;
+  onProgress(0, docs.length);
+  for (const d of docs) {
+    const text = `${d.title}\n${d.body}`;
+    const cached = await cache.get(d.id, text);
+    if (!cached) {
+      const vec = await embed(text);
+      await cache.set(d.id, text, vec);
+    }
+    done++;
+    onProgress(done, docs.length);
+  }
+}
+
 const catalog = [
   {
     id: 'bigram-tfidf-v1',
     label: '超軽量(バイグラム)',
+    description: 'ダウンロード・計算コストほぼゼロ。文字の並びが似ているメモ同士を検出する',
     needsCache: false,
     needsEmbedder: false,
     vectorSearch: async (query, docs, topK) => search.vectorSearch(query, docs, topK),
+    // バイグラムはキャッシュ自体を持たないため、一括再計算は不要(即座に完了扱い)
+    warmCache: async (docs, cache, embed, onProgress) => onProgress(docs.length, docs.length),
   },
   {
     id: 'mpnet-multilingual-base-v2-int8-v1',
     label: '高精度(多言語)',
+    description: '初回は約280MBのモデルをダウンロード。語彙が違っても意味が近いメモを検出できる',
     needsCache: true,
     needsEmbedder: true,
     vectorSearch: (query, docs, topK, cache, embed) =>
       mpnetVectorSearch(query, docs, topK, cache, embed),
+    warmCache: (docs, cache, embed, onProgress) => mpnetWarmCache(docs, cache, embed, onProgress),
   },
 ];
 

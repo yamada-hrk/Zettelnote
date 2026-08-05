@@ -7,22 +7,32 @@
 // RecommendPanel(デスクトップのサイドバー)と共通
 // ============================================================
 import { useRecommend } from './hooks/useRecommend';
+import ModelSwitchBanner from './components/ModelSwitchBanner';
 
 export default function MobileRecommendStrip({
   queryText,
   excludeUid,
   docs,
   onOpen,
+  modelId,
+  switchProgress,
+  switchEtaMs,
 }: {
   queryText: string;
   excludeUid: string | null;
   docs: { uid: string; title: string; body: string }[];
   onOpen: (uid: string) => void;
+  /** 現在アカウントが選択している意味的類似のモデル(4.4) */
+  modelId?: string;
+  /** モデル切り替え中の進捗(4.5)。nullなら非表示 */
+  switchProgress?: { done: number; total: number } | null;
+  switchEtaMs?: number | null;
 }) {
-  const { mode, setMode, items } = useRecommend(queryText, excludeUid, docs);
+  const { mode, setMode, items } = useRecommend(queryText, excludeUid, docs, modelId);
 
   return (
     <div className="shrink-0 border-t border-white/5 bg-white/[0.02]">
+      <ModelSwitchBanner progress={switchProgress ?? null} etaMs={switchEtaMs ?? null} />
       <div className="flex items-center gap-2 px-3 pt-2">
         <span className="shrink-0 text-[11px] font-bold text-slate-400">
           🔗 関連

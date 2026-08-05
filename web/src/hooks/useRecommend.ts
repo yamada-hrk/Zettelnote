@@ -7,7 +7,7 @@
 // をそのまま共有しているため判定結果は完全に同一。
 // ============================================================
 import { useEffect, useState } from 'react';
-import { vectorSearch, keywordSearch, extractTags } from '../lib/search';
+import { vectorSearch, keywordSearch, extractTags, DEFAULT_MODEL_ID } from '../lib/search';
 import type { RecommendItem } from '../types';
 
 export type RecommendMode = 'vector' | 'keyword';
@@ -16,6 +16,7 @@ export function useRecommend(
   queryText: string,
   excludeUid: string | null,
   docs: { uid: string; title: string; body: string }[],
+  modelId: string = DEFAULT_MODEL_ID,
 ) {
   const [mode, setMode] = useState<RecommendMode>('vector');
   const [results, setResults] = useState<{
@@ -60,7 +61,7 @@ export function useRecommend(
     // queryText 等が変わった場合は古いリクエストの結果を捨てる
     // (新しい結果を後から来た古い応答で上書きしないためのガード)
     let cancelled = false;
-    vectorSearch(text, targets, 10).then((vectorResults) => {
+    vectorSearch(text, targets, 10, modelId).then((vectorResults) => {
       if (cancelled) return;
       setResults((prev) => ({
         ...prev,
@@ -71,7 +72,7 @@ export function useRecommend(
     return () => {
       cancelled = true;
     };
-  }, [queryText, excludeUid, docs]);
+  }, [queryText, excludeUid, docs, modelId]);
 
   return {
     mode,

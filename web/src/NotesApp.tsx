@@ -20,10 +20,12 @@ import { useNoteHistory } from './hooks/useNoteHistory';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useNotesStore } from './lib/notesStore';
 import { useVectorSync } from './lib/vectorSync';
+import { useModelSwitch } from './lib/modelSwitch';
 import { extractTags, keywordFilter } from './lib/search';
 import RecommendPanel from './RecommendPanel';
 import MobileRecommendStrip from './MobileRecommendStrip';
 import PanelHandle from './components/PanelHandle';
+import ModelSettingsModal from './components/ModelSettingsModal';
 import type { Note } from './types';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved';
@@ -53,6 +55,14 @@ export default function NotesApp({
   );
   // 意味的類似のベクトル・モデル選択はメモ本文とは別サイクルで同期する(4.2)
   useVectorSync(token, cryptoKey);
+  const {
+    activeModelId,
+    switching: modelSwitching,
+    progress: modelSwitchProgress,
+    etaMs: modelSwitchEtaMs,
+    switchTo: switchModel,
+  } = useModelSwitch(token, cryptoKey, notes);
+  const [showModelSettings, setShowModelSettings] = useState(false);
 
   const leftPanel = useResizablePanel({
     storageKey: 'zettelnote-web:panel:left',
@@ -368,6 +378,12 @@ export default function NotesApp({
 
             <div className="space-y-0.5 border-t border-white/5 px-3 py-2">
               <button
+                onClick={() => setShowModelSettings(true)}
+                className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
+              >
+                🧠 意味的類似のモデル
+              </button>
+              <button
                 onClick={onForgetKey}
                 title="このブラウザに保存した暗号化キーを削除し、次回アンロック画面で再入力を求めます"
                 className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
@@ -517,6 +533,9 @@ export default function NotesApp({
                   excludeUid={recommendExcludeUid}
                   docs={recommendDocs}
                   onOpen={(uid) => selectNote(uid, true)}
+                  modelId={activeModelId}
+                  switchProgress={modelSwitchProgress}
+                  switchEtaMs={modelSwitchEtaMs}
                 />
               )}
             </>
@@ -559,9 +578,24 @@ export default function NotesApp({
               excludeUid={recommendExcludeUid}
               docs={recommendDocs}
               onOpen={(uid) => selectNote(uid, true)}
+              modelId={activeModelId}
+              switchProgress={modelSwitchProgress}
+              switchEtaMs={modelSwitchEtaMs}
             />
           </div>
         </div>
+      )}
+
+      {showModelSettings && (
+        <ModelSettingsModal
+          activeModelId={activeModelId}
+          switching={modelSwitching}
+          onSelect={(modelId) => {
+            setShowModelSettings(false);
+            void switchModel(modelId);
+          }}
+          onClose={() => setShowModelSettings(false)}
+        />
       )}
     </div>
   );
