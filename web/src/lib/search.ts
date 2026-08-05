@@ -34,16 +34,37 @@ let worker: Worker | null = null;
 let nextRequestId = 0;
 const pendingRequests = new Map<number, (result: RecommendItem[]) => void>();
 
+/**
+ * Workerが新しいベクトルを計算した(=IndexedDBキャッシュに書き込んだ)
+ * ことを知らせるリスナー。サーバーへの同期(vectorSync.ts)が使う
+ */
+export type VectorComputedListener = (noteId: string, modelId: string) => void;
+const vectorComputedListeners = new Set<VectorComputedListener>();
+export function onVectorComputed(listener: VectorComputedListener): () => void {
+  vectorComputedListeners.add(listener);
+  return () => vectorComputedListeners.delete(listener);
+}
+
+type WorkerMessage =
+  | { requestId: number; result: any[] }
+  | { type: 'vectorComputed'; noteId: string; modelId: string };
+
 function getWorker(): Worker {
   if (!worker) {
     worker = new Worker(new URL('./embeddingCatalog.worker.ts', import.meta.url), {
       type: 'module',
     });
-    worker.onmessage = (e: MessageEvent<{ requestId: number; result: any[] }>) => {
-      const resolve = pendingRequests.get(e.data.requestId);
+    worker.onmessage = (e: MessageEvent<WorkerMessage>) => {
+      if ('type' in e.data && e.data.type === 'vectorComputed') {
+        const { noteId, modelId } = e.data;
+        vectorComputedListeners.forEach((l) => l(noteId, modelId));
+        return;
+      }
+      const { requestId, result } = e.data as { requestId: number; result: any[] };
+      const resolve = pendingRequests.get(requestId);
       if (!resolve) return; // 呼び出し元が既にキャンセル済み(古いリクエスト)
-      pendingRequests.delete(e.data.requestId);
-      resolve(e.data.result.map((r) => ({ ...r, uid: r.id })));
+      pendingRequests.delete(requestId);
+      resolve(result.map((r) => ({ ...r, uid: r.id })));
     };
   }
   return worker;

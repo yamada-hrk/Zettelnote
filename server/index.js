@@ -15,11 +15,23 @@
 //   PUT  /api/meta          メタ情報を初期登録(既存があれば既存を返す)
 //   GET  /api/notes?since=  server_ms > since のレコードを返す(Pull)
 //   PUT  /api/notes         レコードを一括アップサート(Push / LWW)
+//   GET  /api/note-vectors?since=  意味的類似のベクトルキャッシュ(Pull)
+//   PUT  /api/note-vectors  同上(Push / LWW)
+//   GET  /api/active-model  アカウント単位のモデル選択(未設定ならnull)
+//   PUT  /api/active-model  同上を更新(Push / LWW)
 //
 // ■ 競合解決: Last-Write-Wins
 //   クライアントが付与した updated_ms が新しい方を採用する。
 //   Pull の差分カーソルにはサーバー側の受信時刻(server_ms)を使う
 //   (クライアント間の時計ずれの影響を受けないようにするため)。
+//
+// ■ ベクトルキャッシュ・モデル選択もメモ本文と同じ「暗号化済み
+//   payload + iv」の不透明なブロブとして保存する(サーバーは中身を
+//   一切解釈しない)。メモ本文(sync_notes)とは別テーブル・別の
+//   updated_ms で管理しているのは、「本文の編集」と「ベクトルの
+//   再計算」が異なるタイミングで起きるため、同じLWWタイムスタンプを
+//   共有すると片方の更新がもう片方を巻き込んで競合してしまうのを
+//   避けるため(意味的類似_埋め込みモデル導入提案.md 4.2)
 //
 // ■ Web版クライアントへの対応
 //   Web版はブラウザから直接この API を叩く(クロスオリジンになり得る)ため
@@ -266,6 +278,105 @@ app.put(
   })
 );
 
+// ---- 意味的類似のベクトルキャッシュ(sync_notesと同じ形だが別テーブル) ----
+// Pull
+app.get(
+  '/api/note-vectors',
+  ah(async (req, res) => {
+    const since = Number(req.query.since || 0);
+    const r = await pool.query(
+      `SELECT uid, payload, iv, updated_ms
+       FROM sync_note_vectors WHERE user_id = $1 AND server_ms > $2 ORDER BY server_ms`,
+      [req.userId, since]
+    );
+    res.json({
+      serverNow: Date.now(),
+      vectors: r.rows.map((x) => ({
+        uid: x.uid,
+        payload: x.payload,
+        iv: x.iv,
+        updatedAt: Number(x.updated_ms),
+      })),
+    });
+  })
+);
+
+// Push: LWW アップサート
+app.put(
+  '/api/note-vectors',
+  ah(async (req, res) => {
+    const vectors = (req.body && req.body.vectors) || [];
+    const now = Date.now();
+    let applied = 0;
+    for (const v of vectors) {
+      if (typeof v.uid !== 'string' || typeof v.updatedAt !== 'number') continue;
+      if (typeof v.payload !== 'string' || typeof v.iv !== 'string') continue;
+      const r = await pool.query(
+        `INSERT INTO sync_note_vectors (user_id, uid, payload, iv, updated_ms, server_ms)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (user_id, uid) DO UPDATE SET
+           payload = EXCLUDED.payload,
+           iv = EXCLUDED.iv,
+           updated_ms = EXCLUDED.updated_ms,
+           server_ms = EXCLUDED.server_ms
+         WHERE sync_note_vectors.updated_ms < EXCLUDED.updated_ms`,
+        [req.userId, v.uid, v.payload, v.iv, v.updatedAt, now]
+      );
+      applied += r.rowCount;
+    }
+    res.json({ serverNow: now, applied });
+  })
+);
+
+// ---- アカウント単位のモデル選択(activeEmbeddingModel) ----
+// 1ユーザー1行のみのLWW更新。sync_metaと違い、こちらは可変(モデル
+// 切り替えのたびに更新される)なので、salt/keyCheckの不変な
+// sync_metaとはテーブルを分けている
+app.get(
+  '/api/active-model',
+  ah(async (req, res) => {
+    const r = await pool.query(
+      'SELECT payload, iv, updated_ms FROM active_model WHERE user_id = $1',
+      [req.userId]
+    );
+    if (r.rows.length === 0) return res.json(null);
+    res.json({
+      payload: r.rows[0].payload,
+      iv: r.rows[0].iv,
+      updatedAt: Number(r.rows[0].updated_ms),
+    });
+  })
+);
+
+app.put(
+  '/api/active-model',
+  ah(async (req, res) => {
+    const { payload, iv, updatedAt } = req.body || {};
+    if (typeof payload !== 'string' || typeof iv !== 'string' || typeof updatedAt !== 'number') {
+      return res.status(400).json({ error: '入力内容が不正です' });
+    }
+    await pool.query(
+      `INSERT INTO active_model (user_id, payload, iv, updated_ms)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (user_id) DO UPDATE SET
+         payload = EXCLUDED.payload,
+         iv = EXCLUDED.iv,
+         updated_ms = EXCLUDED.updated_ms
+       WHERE active_model.updated_ms < EXCLUDED.updated_ms`,
+      [req.userId, payload, iv, updatedAt]
+    );
+    const r = await pool.query(
+      'SELECT payload, iv, updated_ms FROM active_model WHERE user_id = $1',
+      [req.userId]
+    );
+    res.json({
+      payload: r.rows[0].payload,
+      iv: r.rows[0].iv,
+      updatedAt: Number(r.rows[0].updated_ms),
+    });
+  })
+);
+
 // ---- Web版アプリの配信(web/dist をビルドしてあれば静的配信する) ----
 // Docker イメージ内では web/dist を同梱するため、API サーバーと
 // Web アプリを同一オリジン・単一コンテナで提供できる(CORS も不要になる)
@@ -328,6 +439,22 @@ async function main() {
       PRIMARY KEY (user_id, uid)
     );
     CREATE INDEX IF NOT EXISTS idx_sync_notes_server ON sync_notes(user_id, server_ms);
+    CREATE TABLE IF NOT EXISTS sync_note_vectors (
+      user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      uid        TEXT NOT NULL,
+      payload    TEXT,
+      iv         TEXT,
+      updated_ms BIGINT NOT NULL,
+      server_ms  BIGINT NOT NULL,
+      PRIMARY KEY (user_id, uid)
+    );
+    CREATE INDEX IF NOT EXISTS idx_sync_note_vectors_server ON sync_note_vectors(user_id, server_ms);
+    CREATE TABLE IF NOT EXISTS active_model (
+      user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      payload    TEXT NOT NULL,
+      iv         TEXT NOT NULL,
+      updated_ms BIGINT NOT NULL
+    );
   `);
   app.listen(PORT, () => console.log(`sync server listening on :${PORT}`));
 }

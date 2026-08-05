@@ -71,4 +71,39 @@ export const api = {
       deleted: boolean;
     }[]
   ) => request<{ serverNow: number; applied: number }>('PUT', '/notes', { notes }, token),
+
+  // ---- 意味的類似のベクトルキャッシュ(4.2) ----
+  getNoteVectors: (token: string, since: number) =>
+    request<{
+      serverNow: number;
+      vectors: { uid: string; payload: string; iv: string; updatedAt: number }[];
+    }>('GET', `/note-vectors?since=${since}`, undefined, token),
+
+  putNoteVectors: (
+    token: string,
+    vectors: { uid: string; iv: string; payload: string; updatedAt: number }[]
+  ) =>
+    request<{ serverNow: number; applied: number }>(
+      'PUT',
+      '/note-vectors',
+      { vectors },
+      token
+    ),
+
+  // ---- アカウント単位のモデル選択(4.4) ----
+  getActiveModel: (token: string) =>
+    request<{ payload: string; iv: string; updatedAt: number } | null>(
+      'GET',
+      '/active-model',
+      undefined,
+      token
+    ),
+
+  putActiveModel: (token: string, payload: string, iv: string, updatedAt: number) =>
+    request<{ payload: string; iv: string; updatedAt: number }>(
+      'PUT',
+      '/active-model',
+      { payload, iv, updatedAt },
+      token
+    ),
 };

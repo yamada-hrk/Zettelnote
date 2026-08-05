@@ -19,6 +19,7 @@ import { useThresholdMode } from './hooks/useThresholdMode';
 import { useNoteHistory } from './hooks/useNoteHistory';
 import { useIsMobile } from './hooks/useIsMobile';
 import { useNotesStore } from './lib/notesStore';
+import { useVectorSync } from './lib/vectorSync';
 import { extractTags, keywordFilter } from './lib/search';
 import RecommendPanel from './RecommendPanel';
 import MobileRecommendStrip from './MobileRecommendStrip';
@@ -50,6 +51,8 @@ export default function NotesApp({
     token,
     cryptoKey,
   );
+  // 意味的類似のベクトル・モデル選択はメモ本文とは別サイクルで同期する(4.2)
+  useVectorSync(token, cryptoKey);
 
   const leftPanel = useResizablePanel({
     storageKey: 'zettelnote-web:panel:left',
