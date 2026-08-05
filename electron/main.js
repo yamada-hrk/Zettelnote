@@ -10,6 +10,7 @@ const db = require('./db');
 const search = require('./search');
 const sync = require('./sync');
 const { extractTags } = require('./tags');
+const { getCatalogEntry, DEFAULT_MODEL_ID } = require('./embeddingCatalog');
 
 /** メインウィンドウの参照(GC防止のため保持) */
 let mainWindow = null;
@@ -138,8 +139,13 @@ function registerIpcHandlers() {
         ),
       }));
 
+    // 意味的類似(ベクトル検索)はモデルカタログ経由で呼び出す。
+    // フェーズ1時点ではアカウント設定(activeEmbeddingModel)がまだ
+    // 存在しないため既定エントリ(バイグラム)固定だが、将来モデルを
+    // 追加してもここを差し替える必要はない
+    const modelEntry = getCatalogEntry(DEFAULT_MODEL_ID);
     return {
-      vector: withSharedTags(search.vectorSearch(text, docs, 10)),
+      vector: withSharedTags(modelEntry.vectorSearch(text, docs, 10)),
       keyword: search.keywordSearch(text, docs, 10),
     };
   });

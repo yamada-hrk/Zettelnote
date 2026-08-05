@@ -50,10 +50,27 @@ export function useRecommend(
         ),
       }));
 
-    setResults({
-      vector: withSharedTags(vectorSearch(text, targets, 10)),
+    // キーワード検索は同期のまま即座に反映
+    setResults((prev) => ({
+      ...prev,
       keyword: withSharedTags(keywordSearch(text, targets, 10)),
+    }));
+
+    // 意味的類似はWorker経由の非同期呼び出し(4.3)。応答が返る前に
+    // queryText 等が変わった場合は古いリクエストの結果を捨てる
+    // (新しい結果を後から来た古い応答で上書きしないためのガード)
+    let cancelled = false;
+    vectorSearch(text, targets, 10).then((vectorResults) => {
+      if (cancelled) return;
+      setResults((prev) => ({
+        ...prev,
+        vector: withSharedTags(vectorResults),
+      }));
     });
+
+    return () => {
+      cancelled = true;
+    };
   }, [queryText, excludeUid, docs]);
 
   return {

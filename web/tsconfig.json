@@ -14,5 +14,5 @@
     "isolatedModules": true,
     "allowJs": true
   },
-  "include": ["src", "../electron/search.js", "../electron/tags.js"]
+  "include": ["src", "../electron/search.js", "../electron/tags.js", "../electron/embeddingCatalog.js"]
 }

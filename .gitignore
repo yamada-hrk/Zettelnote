@@ -13,3 +13,6 @@ tmp/*
 
 # このサーバー固有のKubernetes設定(他サーバーには不要・持ち出せない)
 k8s/
+
+# このサーバー固有の検証用(staging)docker-composeスタック
+docker-compose.staging.yml
