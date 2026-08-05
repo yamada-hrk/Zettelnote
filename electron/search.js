@@ -261,4 +261,4 @@ function makeExcerpt(body, aroundTerm = null, length = 90) {
   return plain.slice(0, length) + (plain.length > length ? '…' : '');
 }
 
-module.exports = { vectorSearch, keywordSearch, keywordFilter };
+module.exports = { vectorSearch, keywordSearch, keywordFilter, makeExcerpt };

@@ -116,7 +116,7 @@ function registerIpcHandlers() {
   });
 
   // レコメンド検索(ベクトル一致・キーワード一致の両方を一度に返す)
-  ipcMain.handle('notes:recommend', (_e, payload) => {
+  ipcMain.handle('notes:recommend', async (_e, payload) => {
     const { excludeId, text } = payload;
     // 空テキストなら空の結果を返す(無駄な計算を避ける)
     if (!text || !text.trim()) {
@@ -140,12 +140,14 @@ function registerIpcHandlers() {
       }));
 
     // 意味的類似(ベクトル検索)はモデルカタログ経由で呼び出す。
-    // フェーズ1時点ではアカウント設定(activeEmbeddingModel)がまだ
+    // フェーズ2時点ではアカウント設定(activeEmbeddingModel)がまだ
     // 存在しないため既定エントリ(バイグラム)固定だが、将来モデルを
-    // 追加してもここを差し替える必要はない
+    // 追加してもここを差し替える必要はない。vectorSearch は全エントリ
+    // 共通でPromiseを返す(mpnetエントリの推論が非同期のため)
     const modelEntry = getCatalogEntry(DEFAULT_MODEL_ID);
+    const vectorResults = await modelEntry.vectorSearch(text, docs, 10);
     return {
-      vector: withSharedTags(modelEntry.vectorSearch(text, docs, 10)),
+      vector: withSharedTags(vectorResults),
       keyword: search.keywordSearch(text, docs, 10),
     };
   });

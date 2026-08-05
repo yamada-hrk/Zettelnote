@@ -3,11 +3,13 @@
 #
 # マルチステージビルド:
 #   1. web-builder … web/ アプリをビルドする。web/ は
-#      electron/search.js・tags.js・embeddingCatalog.js・
+#      electron/search.js・tags.js・embeddingCatalog.js・textHash.js・
 #      src/hooks/useDebounce.ts・src/types.ts を直接 import して
 #      共有しているため、このステージのビルドコンテキストは
 #      リポジトリルートにする必要がある
 #      (docker-compose.yml 側で context: . を指定している)
+#      (electron/mpnetEmbedderNode.js はElectron専用でWeb版からは
+#      参照されないため、ここにはコピーしない)
 #   2. 最終イメージ … API サーバー本体 + ビルド済み web/dist を同梱。
 #      同一オリジンで配信されるため本番では CORS も実質不要になる
 # ============================================================
@@ -19,6 +21,7 @@ WORKDIR /repo
 COPY electron/search.js electron/search.js
 COPY electron/tags.js electron/tags.js
 COPY electron/embeddingCatalog.js electron/embeddingCatalog.js
+COPY electron/textHash.js electron/textHash.js
 
 COPY web/package*.json web/
 RUN cd web && npm install
