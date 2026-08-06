@@ -20,6 +20,7 @@ const DB_NAME = 'zettelnote-vector-cache';
 const STORE_NAME = 'vectors';
 const META_STORE_NAME = 'meta';
 const CURSOR_KEY = 'syncCursor';
+const PENDING_CLEANUP_KEY = 'pendingCleanup';
 
 export interface VectorEntry {
   forBodyHash: string;
@@ -126,4 +127,71 @@ export async function deleteNoteVectors(noteId: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => resolve();
   });
+}
+
+// ---- モデル切り替え後の後片付け(4.6) ----
+//
+// 新モデルへの一括再計算(warmCache)が完了した直後は、ロールバックに
+// 備えて旧モデルのベクトルエントリをすぐには消さない。ここでは
+// 「いつから旧モデルが不要になったか」だけを記録し、実際の掃除
+// (removeModelFromAllNotes・モデル本体のCache Storage削除)は
+// modelSwitch.ts が猶予期間経過後に呼び出す
+
+export interface PendingCleanup {
+  previousModelId: string;
+  switchedAt: number;
+}
+
+/** 直近の切り替えで「掃除待ち」になっている旧モデルの情報を返す(無ければnull) */
+export async function getPendingCleanup(): Promise<PendingCleanup | null> {
+  const db = await openDb();
+  return new Promise((resolve) => {
+    const tx = db.transaction(META_STORE_NAME, 'readonly');
+    const req = tx.objectStore(META_STORE_NAME).get(PENDING_CLEANUP_KEY);
+    req.onsuccess = () => resolve((req.result as PendingCleanup) || null);
+    req.onerror = () => resolve(null);
+  });
+}
+
+/** モデル切り替え完了時に呼ぶ。旧モデルを「掃除待ち」として記録する */
+export async function setPendingCleanup(previousModelId: string): Promise<void> {
+  const db = await openDb();
+  const value: PendingCleanup = { previousModelId, switchedAt: Date.now() };
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(META_STORE_NAME, 'readwrite');
+    tx.objectStore(META_STORE_NAME).put(value, PENDING_CLEANUP_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+/** 掃除が完了した(または掃除の必要がなくなった)ことを記録する */
+export async function clearPendingCleanup(): Promise<void> {
+  const db = await openDb();
+  await new Promise<void>((resolve) => {
+    const tx = db.transaction(META_STORE_NAME, 'readwrite');
+    tx.objectStore(META_STORE_NAME).delete(PENDING_CLEANUP_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => resolve();
+  });
+}
+
+/**
+ * 指定モデルのエントリを、渡されたノートのベクトルマップから取り除く。
+ * 変更が実際にあったノートIDだけを返す(サーバーへの再Push対象を
+ * 呼び出し側が絞り込めるようにするため)
+ */
+export async function removeModelFromAllNotes(
+  modelId: string,
+  noteIds: string[],
+): Promise<string[]> {
+  const changed: string[] = [];
+  for (const noteId of noteIds) {
+    const map = await getNoteVectors(noteId);
+    if (!(modelId in map)) continue;
+    delete map[modelId];
+    await putNoteVectors(noteId, map);
+    changed.push(noteId);
+  }
+  return changed;
 }

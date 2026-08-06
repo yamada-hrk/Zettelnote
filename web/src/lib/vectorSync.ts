@@ -24,6 +24,28 @@ import {
 } from './vectorCache';
 import { onVectorComputed } from './search';
 
+/**
+ * ノート1件の現在のベクトルマップ全体を暗号化してサーバーへ送る。
+ * useVectorSync内部(Worker計算後の自動push)と modelSwitch.ts
+ * (後片付け後の再push)の両方から使う独立関数
+ */
+export async function pushVectorsForNote(
+  token: string,
+  key: CryptoKey,
+  noteId: string,
+): Promise<void> {
+  const vectors = await getNoteVectors(noteId);
+  const enc = await encryptJson(key, vectors);
+  try {
+    await api.putNoteVectors(token, [
+      { uid: noteId, iv: enc.iv, payload: enc.payload, updatedAt: Date.now() },
+    ]);
+  } catch {
+    // 送信に失敗しても致命的ではない(ローカルキャッシュには残っているので、
+    // 次にこのメモのベクトルが再計算された時にまとめて送られる)
+  }
+}
+
 export function useVectorSync(token: string, key: CryptoKey) {
   // 短時間に複数メモのベクトルが計算された場合に、同じメモへの
   // pushを連続で送らないための簡易デバウンス(メモ単位)
@@ -48,23 +70,6 @@ export function useVectorSync(token: string, key: CryptoKey) {
     }
   }, [token, key]);
 
-  const pushVectorsForNote = useCallback(
-    async (noteId: string) => {
-      const vectors = await getNoteVectors(noteId);
-      if (Object.keys(vectors).length === 0) return;
-      const enc = await encryptJson(key, vectors);
-      try {
-        await api.putNoteVectors(token, [
-          { uid: noteId, iv: enc.iv, payload: enc.payload, updatedAt: Date.now() },
-        ]);
-      } catch {
-        // 送信に失敗しても致命的ではない(ローカルキャッシュには残っているので、
-        // 次にこのメモのベクトルが再計算された時にまとめて送られる)
-      }
-    },
-    [token, key],
-  );
-
   useEffect(() => {
     void pullVectors();
 
@@ -76,7 +81,7 @@ export function useVectorSync(token: string, key: CryptoKey) {
         noteId,
         setTimeout(() => {
           timers.delete(noteId);
-          void pushVectorsForNote(noteId);
+          void pushVectorsForNote(token, key, noteId);
         }, 1000),
       );
     });
@@ -86,7 +91,7 @@ export function useVectorSync(token: string, key: CryptoKey) {
       pushTimers.current.forEach((t) => clearTimeout(t));
       pushTimers.current.clear();
     };
-  }, [pullVectors, pushVectorsForNote]);
+  }, [pullVectors, token, key]);
 
   return { pullVectors };
 }

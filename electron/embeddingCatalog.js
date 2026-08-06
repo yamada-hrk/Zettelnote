@@ -115,6 +115,9 @@ const catalog = [
     description: '初回は約280MBのモデルをダウンロード。語彙が違っても意味が近いメモを検出できる',
     needsCache: true,
     needsEmbedder: true,
+    // Web版がモデル本体のブラウザキャッシュ(Cache Storage)を掃除する際、
+    // このリポジトリパスを含むURLのエントリを対象にする(4.6)
+    modelRepo: 'Xenova/paraphrase-multilingual-mpnet-base-v2',
     vectorSearch: (query, docs, topK, cache, embed) =>
       mpnetVectorSearch(query, docs, topK, cache, embed),
     warmCache: (docs, cache, embed, onProgress) => mpnetWarmCache(docs, cache, embed, onProgress),

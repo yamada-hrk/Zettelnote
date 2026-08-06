@@ -54,14 +54,14 @@ export default function NotesApp({
     cryptoKey,
   );
   // 意味的類似のベクトル・モデル選択はメモ本文とは別サイクルで同期する(4.2)
-  useVectorSync(token, cryptoKey);
+  const { pullVectors } = useVectorSync(token, cryptoKey);
   const {
     activeModelId,
     switching: modelSwitching,
     progress: modelSwitchProgress,
     etaMs: modelSwitchEtaMs,
     switchTo: switchModel,
-  } = useModelSwitch(token, cryptoKey, notes);
+  } = useModelSwitch(token, cryptoKey, notes, pullVectors);
   const [showModelSettings, setShowModelSettings] = useState(false);
 
   const leftPanel = useResizablePanel({
