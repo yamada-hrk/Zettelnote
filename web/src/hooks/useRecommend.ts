@@ -26,11 +26,15 @@ export function useRecommend(
     vector: [],
     keyword: [],
   });
+  // 意味的類似は非同期(Worker経由)なので、一致率(%)が実際に
+  // 反映されるまでは古い結果を出しっぱなしにせず、ローディング扱いにする
+  const [vectorLoading, setVectorLoading] = useState(false);
 
   useEffect(() => {
     const text = queryText.trim();
     if (!text) {
       setResults({ vector: [], keyword: [] });
+      setVectorLoading(false);
       return;
     }
     const targets = docs
@@ -59,14 +63,19 @@ export function useRecommend(
 
     // 意味的類似はWorker経由の非同期呼び出し(4.3)。応答が返る前に
     // queryText 等が変わった場合は古いリクエストの結果を捨てる
-    // (新しい結果を後から来た古い応答で上書きしないためのガード)
+    // (新しい結果を後から来た古い応答で上書きしないためのガード)。
+    // 前回の結果はあえて消さずそのまま表示し続け、ローディング状態
+    // (vectorLoading)だけを立てる。呼び出し側はこれをオーバーレイとして
+    // 重ねて表示し、「今の一致率ではない」ことを示しつつ画面のちらつきを防ぐ
     let cancelled = false;
+    setVectorLoading(true);
     vectorSearch(text, targets, 10, modelId).then((vectorResults) => {
       if (cancelled) return;
       setResults((prev) => ({
         ...prev,
         vector: withSharedTags(vectorResults),
       }));
+      setVectorLoading(false);
     });
 
     return () => {
@@ -78,5 +87,6 @@ export function useRecommend(
     mode,
     setMode,
     items: mode === 'vector' ? results.vector : results.keyword,
+    vectorLoading,
   };
 }

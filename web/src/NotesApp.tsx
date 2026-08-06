@@ -187,11 +187,25 @@ export default function NotesApp({
 
   // ---- 関連メモ(検索中はクエリ起点、それ以外は編集中メモ起点) ----
   // デスクトップ版と同じ役割分担: 検索クエリがあればそちらを優先する
-  const recommendRaw = searchQuery.trim() ? searchQuery : `${title}\n${body}`;
-  const debouncedRecommendText = useDebounce(recommendRaw, 600);
-  const recommendExcludeUid = searchQuery.trim()
-    ? null
-    : (selected?.uid ?? null);
+  //
+  // queryText(本文)とexcludeUid(除外するメモ)は必ずセットで一致して
+  // いなければならない。片方だけ即座に更新しもう片方だけデバウンスすると、
+  // 「メモを切り替えた直後〜デバウンスが追いつくまでの間、新しいexcludeUid
+  // (切り替え後のメモ)と古いqueryText(切り替え前のメモの内容)」という
+  // ズレた組み合わせが一時的に発生し、切り替え前のメモが除外されないまま
+  // 自分自身の内容と比較されて「一致率100%」が一瞬表示されてしまう
+  // (実際に発生していたバグ)。これを避けるため、両方を1つのオブジェクトに
+  // まとめてデバウンスし、常に同時に切り替わるようにしている
+  const recommendRaw = useMemo(
+    () => ({
+      text: searchQuery.trim() ? searchQuery : `${title}\n${body}`,
+      excludeUid: searchQuery.trim() ? null : (selected?.uid ?? null),
+    }),
+    [searchQuery, title, body, selected?.uid],
+  );
+  const debouncedRecommend = useDebounce(recommendRaw, 600);
+  const debouncedRecommendText = debouncedRecommend.text;
+  const recommendExcludeUid = debouncedRecommend.excludeUid;
   const recommendDocs = useMemo(
     () => notes.map((n) => ({ uid: n.uid, title: n.title, body: n.body })),
     [notes],

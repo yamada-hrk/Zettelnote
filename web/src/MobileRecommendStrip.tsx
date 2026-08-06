@@ -28,7 +28,13 @@ export default function MobileRecommendStrip({
   switchProgress?: { done: number; total: number } | null;
   switchEtaMs?: number | null;
 }) {
-  const { mode, setMode, items } = useRecommend(queryText, excludeUid, docs, modelId);
+  const { mode, setMode, items, vectorLoading } = useRecommend(
+    queryText,
+    excludeUid,
+    docs,
+    modelId,
+  );
+  const loading = mode === 'vector' && vectorLoading;
 
   return (
     <div className="shrink-0 border-t border-white/5 bg-white/[0.02]">
@@ -61,41 +67,51 @@ export default function MobileRecommendStrip({
         </div>
       </div>
 
-      {items.length === 0 ? (
-        <p className="px-3 py-3 text-center text-[11px] leading-relaxed text-slate-500">
-          {queryText.trim()
-            ? '関連するメモは見つかりませんでした。'
-            : 'メモを書き始めると、ここに関連メモが表示されます。'}
-        </p>
-      ) : (
-        <ul className="thin-scrollbar flex gap-2 overflow-x-auto px-3 py-2.5">
-          {items.map((item) => (
-            <li key={item.uid} className="shrink-0">
-              <button
-                onClick={() => onOpen(item.uid)}
-                className="flex w-40 flex-col items-start gap-1.5 rounded-xl bg-white/[0.04] p-2.5 text-left ring-1 ring-white/[0.07] active:scale-[0.98]"
-              >
-                <span className="line-clamp-2 text-xs font-semibold text-slate-200">
-                  {item.title}
-                </span>
-                <div className="flex w-full items-center gap-1.5">
-                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-400"
-                      style={{
-                        width: `${Math.round(Math.min(Math.max(item.score, 0), 1) * 100)}%`,
-                      }}
-                    />
-                  </div>
-                  <span className="text-[9px] tabular-nums text-slate-500">
-                    {Math.round(Math.min(Math.max(item.score, 0), 1) * 100)}%
+      <div className="relative">
+        {/* ローディング中も前回の結果は消さずそのまま裏に残し、
+            半透明のオーバーレイ+スピナーを重ねる(画面のちらつき防止) */}
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-[#0b0d14]/70 text-[11px] text-slate-400 backdrop-blur-[1px]">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-indigo-400" />
+            <span>計算中…</span>
+          </div>
+        )}
+        {items.length === 0 ? (
+          <p className="px-3 py-3 text-center text-[11px] leading-relaxed text-slate-500">
+            {queryText.trim()
+              ? '関連するメモは見つかりませんでした。'
+              : 'メモを書き始めると、ここに関連メモが表示されます。'}
+          </p>
+        ) : (
+          <ul className="thin-scrollbar flex gap-2 overflow-x-auto px-3 py-2.5">
+            {items.map((item) => (
+              <li key={item.uid} className="shrink-0">
+                <button
+                  onClick={() => onOpen(item.uid)}
+                  className="flex w-40 flex-col items-start gap-1.5 rounded-xl bg-white/[0.04] p-2.5 text-left ring-1 ring-white/[0.07] active:scale-[0.98]"
+                >
+                  <span className="line-clamp-2 text-xs font-semibold text-slate-200">
+                    {item.title}
                   </span>
-                </div>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+                  <div className="flex w-full items-center gap-1.5">
+                    <div className="h-1 flex-1 overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-indigo-400 via-violet-400 to-fuchsia-400"
+                        style={{
+                          width: `${Math.round(Math.min(Math.max(item.score, 0), 1) * 100)}%`,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[9px] tabular-nums text-slate-500">
+                      {Math.round(Math.min(Math.max(item.score, 0), 1) * 100)}%
+                    </span>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
