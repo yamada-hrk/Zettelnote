@@ -7,7 +7,7 @@
 // をそのまま共有しているため判定結果は完全に同一。
 // ============================================================
 import { useEffect, useState } from 'react';
-import { vectorSearch, keywordSearch, extractTags } from '../lib/search';
+import { vectorSearch, keywordSearch, extractTags, DEFAULT_MODEL_ID } from '../lib/search';
 import type { RecommendItem } from '../types';
 
 export type RecommendMode = 'vector' | 'keyword';
@@ -16,6 +16,7 @@ export function useRecommend(
   queryText: string,
   excludeUid: string | null,
   docs: { uid: string; title: string; body: string }[],
+  modelId: string = DEFAULT_MODEL_ID,
 ) {
   const [mode, setMode] = useState<RecommendMode>('vector');
   const [results, setResults] = useState<{
@@ -25,11 +26,15 @@ export function useRecommend(
     vector: [],
     keyword: [],
   });
+  // 意味的類似は非同期(Worker経由)なので、一致率(%)が実際に
+  // 反映されるまでは古い結果を出しっぱなしにせず、ローディング扱いにする
+  const [vectorLoading, setVectorLoading] = useState(false);
 
   useEffect(() => {
     const text = queryText.trim();
     if (!text) {
       setResults({ vector: [], keyword: [] });
+      setVectorLoading(false);
       return;
     }
     const targets = docs
@@ -50,15 +55,38 @@ export function useRecommend(
         ),
       }));
 
-    setResults({
-      vector: withSharedTags(vectorSearch(text, targets, 10)),
+    // キーワード検索は同期のまま即座に反映
+    setResults((prev) => ({
+      ...prev,
       keyword: withSharedTags(keywordSearch(text, targets, 10)),
+    }));
+
+    // 意味的類似はWorker経由の非同期呼び出し(4.3)。応答が返る前に
+    // queryText 等が変わった場合は古いリクエストの結果を捨てる
+    // (新しい結果を後から来た古い応答で上書きしないためのガード)。
+    // 前回の結果はあえて消さずそのまま表示し続け、ローディング状態
+    // (vectorLoading)だけを立てる。呼び出し側はこれをオーバーレイとして
+    // 重ねて表示し、「今の一致率ではない」ことを示しつつ画面のちらつきを防ぐ
+    let cancelled = false;
+    setVectorLoading(true);
+    vectorSearch(text, targets, 10, modelId).then((vectorResults) => {
+      if (cancelled) return;
+      setResults((prev) => ({
+        ...prev,
+        vector: withSharedTags(vectorResults),
+      }));
+      setVectorLoading(false);
     });
-  }, [queryText, excludeUid, docs]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [queryText, excludeUid, docs, modelId]);
 
   return {
     mode,
     setMode,
     items: mode === 'vector' ? results.vector : results.keyword,
+    vectorLoading,
   };
 }

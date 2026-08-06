@@ -91,6 +91,14 @@ export function useNotesStore(token: string, key: CryptoKey) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, key]);
 
+  // 定期同期(デスクトップ版 electron/main.js と同じく60秒間隔)。
+  // syncDelta は since=カーソル の差分取得なので、リロードしなくても
+  // 他端末での更新を(最大60秒遅れで)自動的に拾えるようになる
+  useEffect(() => {
+    const id = setInterval(() => void syncDelta(), 60_000);
+    return () => clearInterval(id);
+  }, [syncDelta]);
+
   /** メモを暗号化してサーバーへ保存し、ローカルの一覧・キャッシュにも反映する */
   const save = useCallback(
     async (uid: string, title: string, body: string, createdAt: string) => {

@@ -10,6 +10,7 @@
 // (リッチ/コンパクト/スリムの3段階)やホバー演出は簡略化している
 // ============================================================
 import { useRecommend } from './hooks/useRecommend';
+import ModelSwitchBanner from './components/ModelSwitchBanner';
 
 export default function RecommendPanel({
   width,
@@ -17,6 +18,9 @@ export default function RecommendPanel({
   excludeUid,
   docs,
   onOpen,
+  modelId,
+  switchProgress,
+  switchEtaMs,
 }: {
   /** パネルの幅。リサイズ対応のため親から渡される(モバイル全画面表示時は '100%') */
   width: number | string;
@@ -26,8 +30,19 @@ export default function RecommendPanel({
   excludeUid: string | null;
   docs: { uid: string; title: string; body: string }[];
   onOpen: (uid: string) => void;
+  /** 現在アカウントが選択している意味的類似のモデル(4.4) */
+  modelId?: string;
+  /** モデル切り替え中の進捗(4.5)。nullなら非表示 */
+  switchProgress?: { done: number; total: number } | null;
+  switchEtaMs?: number | null;
 }) {
-  const { mode, setMode, items } = useRecommend(queryText, excludeUid, docs);
+  const { mode, setMode, items, vectorLoading } = useRecommend(
+    queryText,
+    excludeUid,
+    docs,
+    modelId,
+  );
+  const loading = mode === 'vector' && vectorLoading;
 
   const queryMode = excludeUid === null && queryText.trim().length > 0;
 
@@ -36,6 +51,7 @@ export default function RecommendPanel({
       style={{ width }}
       className="flex h-full shrink-0 flex-col bg-white/[0.02]"
     >
+      <ModelSwitchBanner progress={switchProgress ?? null} etaMs={switchEtaMs ?? null} />
       <div className="border-b border-white/5 px-4 py-3.5">
         <div className="flex items-center gap-2">
           <h2 className="min-w-0 flex-1 truncate text-sm font-bold text-slate-200">
@@ -76,7 +92,16 @@ export default function RecommendPanel({
         </div>
       </div>
 
-      <div className="thin-scrollbar flex-1 overflow-y-auto px-3 py-3">
+      <div className="thin-scrollbar relative flex-1 overflow-y-auto px-3 py-3">
+        {/* ローディング中も前回の結果は消さずそのまま裏に残し、
+            半透明のオーバーレイ+スピナーを重ねる(画面のちらつき防止)。
+            オーバーレイ自体が「今表示されている%は最新ではない」ことを示す */}
+        {loading && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#0b0d14]/70 text-center text-xs text-slate-400 backdrop-blur-[1px]">
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-indigo-400" />
+            <span>計算中…</span>
+          </div>
+        )}
         {items.length === 0 ? (
           <p className="px-2 py-8 text-center text-xs leading-relaxed text-slate-500">
             {queryText.trim()
