@@ -10,7 +10,7 @@
 // (将来の拡張ポイント)。検索(部分一致フィルタ)・関連メモ(意味的類似/
 // キーワード)は electron/search.js を直接共有している。
 // ============================================================
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useDebounce } from './hooks/useDebounce';
@@ -111,16 +111,32 @@ export default function NotesApp({
     return DOMPurify.sanitize(raw);
   }, [preview, body]);
 
+  // 編集中(未保存の変更がある)メモのuidを保持する。他端末からの同期で
+  // selectedの内容が更新されても、編集中のメモは上書きしないためのガード
+  // (値と一致する間だけ下のuseEffectでの自動反映を止める)
+  const dirtyUidRef = useRef<string | null>(null);
+
   const selected = notes.find((n) => n.uid === selectedUid) ?? null;
 
-  // 選択中のメモが変わったらエディタへ反映する
+  // 選択中のメモが変わった時、または(未編集の状態で)他端末からの更新が
+  // 同期で届いた時にエディタへ反映する。selected自体を依存にすることで
+  // 内容(title/body)の変化にも追随する(uidだけを見ていると、開いたまま
+  // のメモが他端末で更新されてもリロード後も古い内容のまま表示され
+  // 続けてしまうバグがあったため。selected.uidだけでなくnotes全体の
+  // 差し替えでselectedオブジェクト自体の参照が変わることを利用している)
   useEffect(() => {
-    if (selected) {
-      setTitle(selected.title);
-      setBody(selected.body);
-      setSaveState('idle');
-    }
-  }, [selected?.uid]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!selected) return;
+    if (dirtyUidRef.current === selected.uid) return;
+    // 内容が既に一致しているなら何もしない(例: 自分自身の保存が完了した
+    // 直後は、保存済みの内容でselectedの参照だけが更新されてこの
+    // useEffectが再度走るが、そのたびに saveState を 'idle' に戻すと
+    // 「✓ 保存済み」の表示が一瞬で消えてしまうため)
+    if (selected.title === title && selected.body === body) return;
+    setTitle(selected.title);
+    setBody(selected.body);
+    setSaveState('idle');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   /**
    * メモを選択する
@@ -220,12 +236,18 @@ export default function NotesApp({
     )
       return;
     setSaveState('saving');
+    const savedUid = selected.uid;
     void save(
-      selected.uid,
+      savedUid,
       debouncedDraft.title,
       debouncedDraft.body,
       selected.createdAt,
-    ).then(() => setSaveState('saved'));
+    ).then(() => {
+      setSaveState('saved');
+      // 保存が完了した時点の下書きが最新(=保存後にさらに編集されていない)
+      // なら、このメモはもう「編集中」ではないので外部更新の反映を再度許可する
+      if (dirtyUidRef.current === savedUid) dirtyUidRef.current = null;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedDraft]);
 
@@ -518,6 +540,7 @@ export default function NotesApp({
                 onChange={(e) => {
                   setTitle(e.target.value);
                   setSaveState('dirty');
+                  if (selected) dirtyUidRef.current = selected.uid;
                 }}
                 placeholder="タイトルを入力…"
                 className="border-b border-white/5 bg-transparent px-6 py-4 text-xl font-bold text-slate-100 outline-none placeholder:text-slate-600"
@@ -534,6 +557,7 @@ export default function NotesApp({
                   onChange={(e) => {
                     setBody(e.target.value);
                     setSaveState('dirty');
+                    if (selected) dirtyUidRef.current = selected.uid;
                   }}
                   placeholder="ここに Markdown でメモを書く…"
                   className="thin-scrollbar flex-1 resize-none bg-transparent px-6 py-4 font-mono text-sm leading-relaxed text-slate-300 outline-none placeholder:text-slate-600"
