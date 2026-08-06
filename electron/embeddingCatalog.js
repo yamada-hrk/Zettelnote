@@ -122,6 +122,16 @@ async function mpnetVectorSearch(query, docs, topK, cache, embed) {
 async function mpnetWarmCache(docs, cache, embed, onProgress) {
   let done = 0;
   onProgress(0, docs.length);
+
+  // 候補メモが全件キャッシュヒットだと、このあとの for ループが一度も
+  // embed() を呼ばずに終わってしまう。すると推論エンジン(ONNX/WASM)の
+  // 初回ロードが行われないまま起動時チェックが完了し、ユーザーが最初に
+  // 関連メモを開いたタイミングで初めてロードが走って20秒以上「計算中…」の
+  // まま待たされることになる(実測で確認済み)。起動時チェックは既に
+  // 「類似度モデルを更新中」の進捗表示でカバーされているため、ここで
+  // ダミーの埋め込みを1回実行して先に初期化コストを払っておく
+  await embed(' ');
+
   for (const d of docs) {
     const text = `${d.title}\n${d.body}`;
     const cached = await cache.get(d.id, text);

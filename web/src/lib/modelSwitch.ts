@@ -126,12 +126,22 @@ export function useModelSwitch(
     if (notes.length === 0 || startedInitialCheck.current) return;
     startedInitialCheck.current = true;
     (async () => {
+      // サーバー側に既に計算済みのベクトルがあれば先に取り込んでおく。
+      // これを待たずにwarmCacheのキャッシュ判定を走らせると、新しい
+      // 端末(ローカルIndexedDBが空)では「まだPullが終わっていないので
+      // 全件キャッシュミス」という誤判定になり、他端末が既に計算済みの
+      // ベクトルを再利用できず、常に一から全件再計算してしまう
+      // (実際に負荷試験で発生していたバグ。4.6の後片付け処理側では
+      // 同種の競合を先に修正済みだったが、こちらの起動時チェックには
+      // 同じ修正が漏れていた)
+      await pullVectors();
+
       const stored = await getActiveModel(token, key);
       const modelId = stored ?? DEFAULT_MODEL_ID;
       setActiveModelIdState(modelId);
       await runWarmCache(modelId, notes);
     })();
-  }, [token, key, notes, runWarmCache]);
+  }, [token, key, notes, runWarmCache, pullVectors]);
 
   // 起動時: 前回の切り替えから猶予期間が過ぎていれば後片付けする(4.6)
   useEffect(() => {
