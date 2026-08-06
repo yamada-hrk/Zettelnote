@@ -54,6 +54,11 @@ const PORT = Number(process.env.PORT || 8787);
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
 const app = express();
+// リバースプロキシ(k3s/Traefik)を1段挟んで動かすため、X-Forwarded-For の
+// 先頭1ホップ分だけを信頼する。未設定だとexpress-rate-limitがIPベースの
+// 判定を拒否し(ERR_ERL_UNEXPECTED_X_FORWARDED_FOR)、全リクエストが
+// 同一の送信元として扱われて他ユーザーとレート制限枠を共有してしまう
+app.set('trust proxy', 1);
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
@@ -228,10 +233,35 @@ app.put(
   })
 );
 
+/**
+ * Pull応答の次回カーソル。
+ *
+ * server_ms は各PUSHハンドラの先頭で Date.now() を取得して払い出すが、
+ * 「値の割り当て順」と「INSERTの実コミット順」は必ずしも一致しない
+ * (2つの同時PUSH要求のうち、先にserver_msを払い出した方が、DB接続の
+ * 取得やイベントループの都合で後からコミットされることがある)。
+ * 素朴に「今回のPullで見えた行の最大server_ms」までカーソルを進めると、
+ * まだコミット中で見えていない、より小さいserver_msを持つ行を
+ * 将来にわたって永久に取りこぼす(=他端末の更新が反映されない)。
+ * 実測(50件同時PUSH+並行Pull)でこの欠落を確認済み。
+ *
+ * そのため、直近 PULL_CURSOR_SAFETY_MARGIN_MS 以内に払い出された
+ * server_ms 領域は「まだ確定していないかもしれない」とみなし、
+ * カーソルをそこまでは進めない。通常のリクエスト~コミットの所要時間は
+ * 数十〜数百msなので、数秒の安全マージンを取れば実用上十分安全。
+ * 新しいレコードは(このマージン中でも)今回のPullで即座に見えるので
+ * ユーザー体験への影響はなく、次回以降のPullでの取りこぼしのみを防ぐ
+ */
+const PULL_CURSOR_SAFETY_MARGIN_MS = 5000;
+function nextCursor(since, requestStartedAt) {
+  return Math.max(since, requestStartedAt - PULL_CURSOR_SAFETY_MARGIN_MS);
+}
+
 // ---- Pull: 前回同期以降にサーバーが受信したレコードを返す ----
 app.get(
   '/api/notes',
   ah(async (req, res) => {
+    const requestStartedAt = Date.now();
     const since = Number(req.query.since || 0);
     const r = await pool.query(
       `SELECT uid, payload, iv, updated_ms, deleted
@@ -239,7 +269,7 @@ app.get(
       [req.userId, since]
     );
     res.json({
-      serverNow: Date.now(),
+      serverNow: nextCursor(since, requestStartedAt),
       notes: r.rows.map((x) => ({
         uid: x.uid,
         payload: x.payload,
@@ -283,6 +313,7 @@ app.put(
 app.get(
   '/api/note-vectors',
   ah(async (req, res) => {
+    const requestStartedAt = Date.now();
     const since = Number(req.query.since || 0);
     const r = await pool.query(
       `SELECT uid, payload, iv, updated_ms
@@ -290,7 +321,8 @@ app.get(
       [req.userId, since]
     );
     res.json({
-      serverNow: Date.now(),
+      // /api/notes と同じ理由(コメント参照)でカーソルには安全マージンを設ける
+      serverNow: nextCursor(since, requestStartedAt),
       vectors: r.rows.map((x) => ({
         uid: x.uid,
         payload: x.payload,
