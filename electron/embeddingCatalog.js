@@ -42,6 +42,24 @@ function cosine(a, b) {
   return denom > 0 ? dot / denom : 0;
 }
 
+// mpnetのコサイン類似度は「無関係でも0」にはならず、しかもノイズの
+// 振れ幅が読めない(実測で意味のない文字列が実在する無関係メモより
+// 高スコアになる例すら確認した)。固定の絶対閾値(例: score > 0.15)を
+// 検証したところ、このノイズをほぼ素通ししてしまい機能しなかった上、
+// メモ数が増えるほど「たまたま高スコアになったノイズ」に遭遇する確率
+// も上がるため、原理的にスケールしない。
+//
+// 代わりに、そのクエリにおける**候補全体のスコア分布に対する相対的な
+// 位置づけ(z-score)**で判定する。実測(候補7件・14件の両方)では、
+// 本当に関連するメモのz-scoreが2.0〜2.4程度で他を大きく引き離す一方、
+// ノイズ・無関係な実データはすべて-1.5〜0.7程度に収まっており、
+// 固定閾値よりはっきりした分離が得られた。候補数が増えてもこの傾向は
+// 崩れなかった(絶対閾値ではノイズの最大値も候補数と共に伸びるが、
+// z-scoreは母集団を都度参照するためこの影響を受けにくい)
+const MPNET_Z_SCORE_THRESHOLD = 1.0;
+/** z-score判定に必要な最小候補数。これを下回る場合は統計的に無意味なため足切りしない */
+const MPNET_MIN_CANDIDATES_FOR_Z_SCORE = 5;
+
 /**
  * mpnet-base-v2 によるベクトル検索。
  * @param {(text: string) => Promise<number[]>} embed 埋め込み関数(呼び出し側が注入)
@@ -65,13 +83,31 @@ async function mpnetVectorSearch(query, docs, topK, cache, embed) {
     }),
   );
 
-  return docs
-    .map((d, i) => ({
-      id: d.id,
-      title: d.title || '(無題)',
-      excerpt: search.makeExcerpt(d.body),
-      score: cosine(queryVec, docVecs[i]),
-    }))
+  const scored = docs.map((d, i) => ({
+    id: d.id,
+    title: d.title || '(無題)',
+    excerpt: search.makeExcerpt(d.body),
+    score: cosine(queryVec, docVecs[i]),
+  }));
+
+  // 候補が少なすぎる場合、平均・標準偏差は母集団を代表しないので
+  // 足切りせずそのまま返す(ユーザー自身が目視で判断する前提)
+  if (scored.length < MPNET_MIN_CANDIDATES_FOR_Z_SCORE) {
+    return scored.sort((a, b) => b.score - a.score).slice(0, topK);
+  }
+
+  const mean = scored.reduce((sum, s) => sum + s.score, 0) / scored.length;
+  const variance =
+    scored.reduce((sum, s) => sum + (s.score - mean) ** 2, 0) / scored.length;
+  const std = Math.sqrt(variance);
+
+  // 標準偏差が0(全候補が同スコア)の場合、z-scoreは定義できないため
+  // 足切りしない
+  const passesThreshold = (s) =>
+    std === 0 ? true : (s.score - mean) / std > MPNET_Z_SCORE_THRESHOLD;
+
+  return scored
+    .filter(passesThreshold)
     .sort((a, b) => b.score - a.score)
     .slice(0, topK);
 }
