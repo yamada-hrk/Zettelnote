@@ -1,0 +1,234 @@
+:root {
+  --bg: #0b0d14;
+  --bg-alt: #10131d;
+  --card: rgba(255, 255, 255, 0.03);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #e2e5f1;
+  --text-dim: #94a0c2;
+  --indigo: #818cf8;
+  --violet: #c4b5fd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+    "Yu Gothic", sans-serif;
+  line-height: 1.7;
+}
+
+a {
+  color: inherit;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.hero {
+  background: radial-gradient(
+      circle at 50% -10%,
+      rgba(129, 140, 248, 0.18),
+      transparent 60%
+    ),
+    var(--bg);
+  padding-bottom: 5rem;
+}
+
+.nav {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+}
+
+.brand img {
+  border-radius: 6px;
+}
+
+.nav-cta {
+  font-size: 0.85rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.hero-inner {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 4rem 1.25rem 0;
+  text-align: center;
+}
+
+.hero-icon {
+  border-radius: 22px;
+  box-shadow: 0 20px 60px -20px rgba(129, 140, 248, 0.5);
+  margin-bottom: 2rem;
+}
+
+.hero h1 {
+  font-size: clamp(1.9rem, 5vw, 2.8rem);
+  margin: 0 0 1.25rem;
+}
+
+.hero-lead {
+  color: var(--text-dim);
+  font-size: 1.05rem;
+  max-width: 560px;
+  margin: 0 auto 2.25rem;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--indigo), var(--violet));
+  color: #0b0d14;
+}
+
+.btn-primary:hover {
+  opacity: 0.9;
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.btn-lg {
+  padding: 0.9rem 2rem;
+  font-size: 1.05rem;
+}
+
+.section {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 5rem 1.25rem;
+}
+
+.section h2 {
+  font-size: clamp(1.5rem, 3.5vw, 2rem);
+  text-align: center;
+  margin: 0 0 3rem;
+  background: linear-gradient(135deg, var(--indigo), var(--violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.section-alt {
+  background: var(--bg-alt);
+  max-width: none;
+}
+
+.section-alt > * {
+  max-width: 720px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1.75rem;
+}
+
+.card-icon {
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.card h3 {
+  font-size: 1.05rem;
+  margin: 0 0 0.6rem;
+}
+
+.card p {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.how-block {
+  margin-bottom: 3rem;
+}
+
+.how-block:last-child {
+  margin-bottom: 0;
+}
+
+.how-block h3 {
+  font-size: 1.15rem;
+  margin: 0 0 0.75rem;
+  color: var(--violet);
+}
+
+.how-block p {
+  color: var(--text-dim);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.cta-section {
+  text-align: center;
+}
+
+.cta-section p {
+  color: var(--text-dim);
+  margin: 0 0 2rem;
+}
+
+.footer {
+  text-align: center;
+  padding: 3rem 1.25rem;
+  color: var(--text-dim);
+  font-size: 0.8rem;
+  border-top: 1px solid var(--border);
+}

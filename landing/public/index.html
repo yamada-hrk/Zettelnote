@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ZettelNote — つながりで育てるメモアプリ</title>
+<meta name="description" content="ZettelNoteは、書いたメモ同士のつながりをリアルタイムに提示するツェッテルカステン式のメモアプリです。ゼロ知識暗号化でサーバーはあなたのメモを一切読めません。デスクトップ版・Web版(PWA)に対応。" />
+<link rel="icon" href="/about/assets/favicon-32.png" />
+<link rel="stylesheet" href="/about/style.css" />
+</head>
+<body>
+
+<header class="hero">
+  <nav class="nav">
+    <div class="brand">
+      <img src="/about/assets/favicon-32.png" alt="" width="24" height="24" />
+      <span>ZettelNote</span>
+    </div>
+    <a class="nav-cta" href="https://zettelnote.hol-tec.net/">アプリを開く</a>
+  </nav>
+
+  <div class="hero-inner">
+    <img class="hero-icon" src="/about/assets/icon-512.png" alt="ZettelNoteアイコン" width="96" height="96" />
+    <h1>書いたメモが、<br />自然につながっていく。</h1>
+    <p class="hero-lead">
+      ZettelNoteは、メモを書くたびに関連する過去のメモをリアルタイムで提示する
+      ツェッテルカステン(Zettelkasten)式のメモアプリです。
+      整理するためではなく、つながりを発見するためのメモ帳。
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://zettelnote.hol-tec.net/">今すぐ使ってみる</a>
+      <a class="btn btn-ghost" href="#features">機能を見る</a>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section id="features" class="section">
+  <h2>特徴</h2>
+  <div class="cards">
+    <article class="card">
+      <div class="card-icon">🔗</div>
+      <h3>関連メモをリアルタイム提示</h3>
+      <p>
+        メモを書いている最中から、内容が近い過去のメモを自動でサイドパネルに表示します。
+        「あの話、前にも書いたな」を思い出す前に、向こうから教えてくれます。
+      </p>
+    </article>
+    <article class="card">
+      <div class="card-icon">✨</div>
+      <h3>意味的類似検索</h3>
+      <p>
+        キーワードが一致しなくても、意味が近いメモを見つけ出す埋め込みモデルによる検索に対応。
+        軽量なバイグラム検索から、多言語対応の高精度モデルまで、用途に応じて選択できます。
+      </p>
+    </article>
+    <article class="card">
+      <div class="card-icon">🔒</div>
+      <h3>ゼロ知識暗号化</h3>
+      <p>
+        メモは端末上でAES-256-GCM暗号化された状態でサーバーへ送られます。
+        サーバーは暗号化キーを一切保持しないため、運営者であってもメモの中身を読むことはできません。
+      </p>
+    </article>
+    <article class="card">
+      <div class="card-icon">💻</div>
+      <h3>デスクトップ版 + Web版</h3>
+      <p>
+        Windows・Mac・Linux向けのデスクトップアプリ(Electron)と、
+        ブラウザだけで使えるPWA版(オフライン起動・ホーム画面追加に対応)の両方を用意しています。
+      </p>
+    </article>
+    <article class="card">
+      <div class="card-icon">🔄</div>
+      <h3>マルチデバイス同期</h3>
+      <p>
+        デスクトップとスマホ、複数端末で書いたメモは自動的に同期されます。
+        今開いているメモが他の端末で更新されれば、そのままリアルタイムに反映されます。
+      </p>
+    </article>
+    <article class="card">
+      <div class="card-icon">🏷️</div>
+      <h3>ハッシュタグとキーワード検索</h3>
+      <p>
+        #タグによる分類や、部分一致のキーワード検索など、
+        従来からのシンプルな整理・検索手段ももちろん使えます。
+      </p>
+    </article>
+  </div>
+</section>
+
+<section id="how" class="section section-alt">
+  <h2>仕組み</h2>
+
+  <div class="how-block">
+    <h3>ツェッテルカステンという考え方</h3>
+    <p>
+      ツェッテルカステン(Zettelkasten、ドイツ語で「メモ箱」の意)は、
+      社会学者ニクラス・ルーマンが実践していたメモ術です。フォルダやタグで
+      トップダウンに分類するのではなく、メモとメモを「つながり」でボトムアップに
+      結びつけていくことで、後から見返したときに思わぬ発見が生まれます。
+      ZettelNoteはこの考え方を、手作業でリンクを貼らなくても
+      自動的につながりを提示する形でソフトウェア化したものです。
+    </p>
+  </div>
+
+  <div class="how-block">
+    <h3>ゼロ知識暗号化の仕組み</h3>
+    <p>
+      あなたが入力したメモは、送信される前に端末上(ブラウザまたはデスクトップアプリ内)で
+      AES-256-GCMにより暗号化されます。暗号化キーはあなたが設定するパスフレーズから
+      端末上で導出され、サーバーへ送信されることはありません。サーバーが保存するのは
+      暗号化済みのデータだけなので、データベースが漏えいしても、パスフレーズを知らない
+      限りメモの中身を読むことはできません。
+    </p>
+  </div>
+
+  <div class="how-block">
+    <h3>意味的類似検索モデル</h3>
+    <p>
+      関連メモの検索には、文字の並びが似ているメモを高速に検出する「バイグラム検索」と、
+      文章の意味そのものをベクトル化して比較する多言語対応の埋め込みモデルの、
+      2種類から選んで使うことができます。前者はほぼゼロコストで動作し、
+      後者は語彙が異なっていても意味が近いメモを見つけ出せます。
+    </p>
+  </div>
+</section>
+
+<section class="section cta-section">
+  <h2>つながりを、書きながら発見する。</h2>
+  <p>アカウント登録は無料です。今すぐメモを書き始めてみてください。</p>
+  <a class="btn btn-primary btn-lg" href="https://zettelnote.hol-tec.net/">ZettelNoteを開く</a>
+</section>
+
+</main>
+
+<footer class="footer">
+  <p>ZettelNote — つながりで育てるメモアプリ</p>
+</footer>
+
+</body>
+</html>
