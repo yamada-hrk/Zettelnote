@@ -49,5 +49,16 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # 製品紹介ページ(zettelnote.top のルートで公開)。中身はアプリ本体(api)とは
+  # 無関係な静的サイトなので別コンテナに分けている。landing/ の中身はすべて
+  # 相対パスなので、ここではprefixの付け外し(k8s Ingress側のstripPrefix)は不要
+  landing:
+    build:
+      context: .
+      dockerfile: landing/Dockerfile
+    ports:
+      - "8790:80"
+    restart: unless-stopped
+
 volumes:
   zettel-db:
