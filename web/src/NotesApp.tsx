@@ -18,14 +18,12 @@ import { useResizablePanel } from './hooks/useResizablePanel';
 import { useThresholdMode } from './hooks/useThresholdMode';
 import { useNoteHistory } from './hooks/useNoteHistory';
 import { useIsMobile } from './hooks/useIsMobile';
-import { useNotesStore } from './lib/notesStore';
-import { useVectorSync } from './lib/vectorSync';
-import { useModelSwitch } from './lib/modelSwitch';
 import { extractTags, keywordFilter } from './lib/search';
 import RecommendPanel from './RecommendPanel';
 import MobileRecommendStrip from './MobileRecommendStrip';
 import PanelHandle from './components/PanelHandle';
 import ModelSettingsModal from './components/ModelSettingsModal';
+import LocalAdBanner from './components/LocalAdBanner';
 import type { Note } from './types';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved';
@@ -35,33 +33,55 @@ const CARD_MODE_ENTER = 380;
 /** カード表示からリスト表示に戻るしきい値(チラつき防止のヒステリシス) */
 const CARD_MODE_EXIT = 340;
 
+/**
+ * アカウント同期モード(ログイン済み)/ ローカルモード(未ログイン、この端末の
+ * IndexedDBのみ)のどちらでも使う共通のメイン画面。呼び出し元(AuthenticatedApp.tsx
+ * / LocalModeApp.tsx)がそれぞれ useNotesStore / useLocalNotesStore などの
+ * 結果をpropsとして注入する形にすることで、この本体はモードを意識せずに済む
+ */
 export default function NotesApp({
-  token,
+  mode,
   username,
-  cryptoKey,
+  notes,
+  loading,
+  error,
+  save,
+  remove,
+  create,
+  activeModelId,
+  modelSwitching,
+  modelSwitchProgress,
+  modelSwitchEtaMs,
+  switchModel,
   onLogout,
   onForgetKey,
+  onRequestLogin,
 }: {
-  token: string;
-  username: string;
-  cryptoKey: CryptoKey;
-  onLogout: () => void;
-  /** アカウントはログインしたまま、保存済み暗号化キーだけ削除して再入力を求める */
-  onForgetKey: () => void;
+  mode: 'account' | 'local';
+  /** ローカルモードではアカウントが無いため null */
+  username: string | null;
+  notes: Note[];
+  loading: boolean;
+  error: string | null;
+  save: (
+    uid: string,
+    title: string,
+    body: string,
+    createdAt: string,
+  ) => Promise<void>;
+  remove: (uid: string) => Promise<void>;
+  create: () => Promise<string>;
+  activeModelId: string;
+  modelSwitching: boolean;
+  modelSwitchProgress: { done: number; total: number } | null;
+  modelSwitchEtaMs: number | null;
+  switchModel: (modelId: string) => Promise<void>;
+  /** アカウントはログインしたまま、保存済み暗号化キーだけ削除して再入力を求める(accountモードのみ) */
+  onLogout?: () => void;
+  onForgetKey?: () => void;
+  /** ローカルモードから、ログイン/新規登録画面へ切り替える(localモードのみ) */
+  onRequestLogin?: () => void;
 }) {
-  const { notes, loading, error, save, remove, create } = useNotesStore(
-    token,
-    cryptoKey,
-  );
-  // 意味的類似のベクトル・モデル選択はメモ本文とは別サイクルで同期する(4.2)
-  const { pullVectors } = useVectorSync(token, cryptoKey);
-  const {
-    activeModelId,
-    switching: modelSwitching,
-    progress: modelSwitchProgress,
-    etaMs: modelSwitchEtaMs,
-    switchTo: switchModel,
-  } = useModelSwitch(token, cryptoKey, notes, pullVectors);
   const [showModelSettings, setShowModelSettings] = useState(false);
 
   const leftPanel = useResizablePanel({
@@ -273,7 +293,8 @@ export default function NotesApp({
   const showRelatedPane = !isMobile;
 
   return (
-    <div className={isMobile ? 'flex h-full flex-col' : 'flex h-full'}>
+    <div className="flex h-full flex-col">
+    <div className={isMobile ? 'flex min-h-0 flex-1 flex-col' : 'flex min-h-0 flex-1'}>
       {/* 左: メモ一覧
           外側ラッパーの width をアニメーションさせて開閉し、
           内側は固定幅を保つことで折りたたみ中も内容が潰れない
@@ -313,7 +334,13 @@ export default function NotesApp({
                   </span>
                 )}
               </h1>
-              <span className="text-[10px] text-slate-500">@{username}</span>
+              {mode === 'account' ? (
+                <span className="text-[10px] text-slate-500">@{username}</span>
+              ) : (
+                <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium text-indigo-300 ring-1 ring-indigo-400/25">
+                  ローカルモード
+                </span>
+              )}
             </div>
 
             <div className="px-3 pt-3 pb-2">
@@ -419,19 +446,30 @@ export default function NotesApp({
               >
                 🧠 意味的類似のモデル
               </button>
-              <button
-                onClick={onForgetKey}
-                title="このブラウザに保存した暗号化キーを削除し、次回アンロック画面で再入力を求めます"
-                className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
-              >
-                🔒 キーの記憶を削除
-              </button>
-              <button
-                onClick={onLogout}
-                className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
-              >
-                ログアウト
-              </button>
+              {mode === 'account' ? (
+                <>
+                  <button
+                    onClick={onForgetKey}
+                    title="このブラウザに保存した暗号化キーを削除し、次回アンロック画面で再入力を求めます"
+                    className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
+                  >
+                    🔒 キーの記憶を削除
+                  </button>
+                  <button
+                    onClick={onLogout}
+                    className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
+                  >
+                    ログアウト
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={onRequestLogin}
+                  className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-indigo-300 transition-colors hover:bg-white/10"
+                >
+                  👤 ログイン / アカウント登録
+                </button>
+              )}
             </div>
           </aside>
         </div>
@@ -623,9 +661,18 @@ export default function NotesApp({
           </div>
         </div>
       )}
+    </div>
+
+      {/* ローカルモード(未登録)かつPCブラウザの時のみ、画面下部に小さく
+          広告を表示する(意味的類似_埋め込みモデル導入提案とは別件。
+          tmp/未ログイン体験の導入提案.md 参照)。ログイン済みユーザーの
+          実際のメモを扱う画面や、ただでさえ狭いスマホ画面には出さない。
+          エディタ・関連メモパネルなど実操作領域そのものには重ねない */}
+      {mode === 'local' && !isMobile && <LocalAdBanner />}
 
       {showModelSettings && (
         <ModelSettingsModal
+          mode={mode}
           activeModelId={activeModelId}
           switching={modelSwitching}
           onSelect={(modelId) => {

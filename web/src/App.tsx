@@ -10,7 +10,8 @@
 import { useEffect, useState } from 'react';
 import LoginScreen, { type Auth } from './screens/LoginScreen';
 import UnlockScreen from './screens/UnlockScreen';
-import NotesApp from './NotesApp';
+import AuthenticatedApp from './AuthenticatedApp';
+import LocalModeApp from './LocalModeApp';
 import { clearKey, loadKey } from './lib/keyStore';
 import { clearNoteCache } from './lib/noteCache';
 
@@ -28,6 +29,10 @@ function loadAuth(): Auth | null {
 export default function App() {
   const [auth, setAuth] = useState<Auth | null>(loadAuth);
   const [cryptoKey, setCryptoKey] = useState<CryptoKey | null>(null);
+  // 未ログイン時のデフォルト画面はログイン画面ではなくローカルモード
+  // (未ログイン体験の導入提案参照)。このボタンを押した時だけログイン/
+  // 新規登録画面へ切り替える
+  const [showLogin, setShowLogin] = useState(false);
   // 保存済みキーの確認が終わるまでは何も描画しない(未確認のまま
   // 一瞬アンロック画面がちらつくのを防ぐ)
   const [checkingSavedKey, setCheckingSavedKey] = useState(!!auth);
@@ -75,7 +80,17 @@ export default function App() {
     setCryptoKey(null);
   };
 
-  if (!auth) return <LoginScreen onAuthed={handleAuthed} />;
+  if (!auth) {
+    if (showLogin) {
+      return (
+        <LoginScreen
+          onAuthed={handleAuthed}
+          onBack={() => setShowLogin(false)}
+        />
+      );
+    }
+    return <LocalModeApp onRequestLogin={() => setShowLogin(true)} />;
+  }
   if (checkingSavedKey) return null;
   if (!cryptoKey) {
     return (
@@ -88,7 +103,7 @@ export default function App() {
     );
   }
   return (
-    <NotesApp
+    <AuthenticatedApp
       token={auth.token}
       username={auth.username}
       cryptoKey={cryptoKey}

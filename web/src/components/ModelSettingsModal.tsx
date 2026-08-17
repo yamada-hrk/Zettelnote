@@ -8,11 +8,14 @@
 import { modelCatalog } from '../lib/modelSwitch';
 
 export default function ModelSettingsModal({
+  mode,
   activeModelId,
   switching,
   onSelect,
   onClose,
 }: {
+  /** ローカルモードにはアカウント・他端末が存在しないため説明文を出し分ける */
+  mode: 'account' | 'local';
   activeModelId: string;
   switching: boolean;
   onSelect: (modelId: string) => void;
@@ -29,7 +32,9 @@ export default function ModelSettingsModal({
       >
         <h2 className="text-sm font-bold text-slate-200">🧠 意味的類似のモデル</h2>
         <p className="mt-1 text-xs leading-relaxed text-slate-500">
-          切り替えると、このアカウントの全端末に反映され、全メモの再計算が始まります。
+          {mode === 'account'
+            ? '切り替えると、このアカウントの全端末に反映され、全メモの再計算が始まります。'
+            : '切り替えると、この端末上で全メモの再計算が始まります(ローカルモードのため他端末には影響しません)。'}
         </p>
 
         <ul className="mt-4 space-y-2">

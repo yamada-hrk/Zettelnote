@@ -13,8 +13,11 @@ export interface Auth {
 
 export default function LoginScreen({
   onAuthed,
+  onBack,
 }: {
   onAuthed: (auth: Auth) => void;
+  /** ローカルモードから遷移してきた場合、ログインせずに戻る */
+  onBack?: () => void;
 }) {
   const [register, setRegister] = useState(false);
   const [username, setUsername] = useState('');
@@ -85,6 +88,14 @@ export default function LoginScreen({
         </div>
 
         <div className="w-full max-w-sm justify-self-center rounded-2xl border border-white/10 bg-[#12151f]/95 p-6 shadow-2xl shadow-black/60 backdrop-blur-xl md:justify-self-end">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="mb-3 text-xs text-slate-500 hover:text-slate-300"
+            >
+              ← ログインせずに試す(ローカルモード)
+            </button>
+          )}
           <h2 className="text-lg font-bold text-slate-200">
             🗂️{' '}
             <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
