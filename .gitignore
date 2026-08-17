@@ -16,3 +16,6 @@ k8s/
 
 # このサーバー固有の検証用(staging)docker-composeスタック
 docker-compose.staging.yml
+
+# このホスト固有の運用ルール・デプロイ手順のメモ(他環境では通用しないため非公開)
+CLAUDE.md
