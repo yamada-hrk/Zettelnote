@@ -41,81 +41,128 @@ export default function LoginScreen({
     'w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-slate-200 ring-1 ring-white/10 outline-none transition-shadow placeholder:text-slate-600 focus:ring-indigo-400/50';
 
   return (
-    <div className="flex h-full items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#12151f]/95 p-6 shadow-2xl shadow-black/60 backdrop-blur-xl">
-        <h1 className="text-lg font-bold text-slate-200">
-          🗂️{' '}
-          <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-            ZettelNote
-          </span>
-        </h1>
-        <p className="mt-1 text-xs text-slate-500">
-          Web版はサーバーへのログインが必須です(常時同期のシンクライアント)。
-        </p>
-
-        <div className="mt-4 flex rounded-xl bg-white/5 p-0.5 text-xs font-medium">
-          <button
-            onClick={() => setRegister(false)}
-            className={`flex-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${
-              !register
-                ? 'bg-white/10 text-indigo-300 shadow-sm'
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
+    <div className="flex h-full items-center justify-center overflow-y-auto px-4 py-8">
+      <div className="grid w-full max-w-4xl gap-8 md:grid-cols-[1.1fr_1fr] md:items-center">
+        {/* 製品紹介(ログインフォームだけの「行き止まり」画面にならないよう、
+            zettelnote.top のランディングページの要約をここにも置いている) */}
+        <div className="px-1">
+          <h1 className="text-2xl font-bold text-slate-100 md:text-3xl">
+            書いたメモが、
+            <br />
+            <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
+              自然につながっていく。
+            </span>
+          </h1>
+          <p className="mt-3 text-sm leading-relaxed text-slate-400">
+            ZettelNoteは、メモを書くたびに関連する過去のメモをリアルタイムで提示する
+            ツェッテルカステン式のメモアプリです。整理するためではなく、つながりを
+            発見するためのメモ帳。
+          </p>
+          <ul className="mt-5 space-y-2.5 text-sm text-slate-300">
+            <li className="flex items-start gap-2">
+              <span>🔗</span>
+              <span>関連メモをリアルタイムに提示</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>✨</span>
+              <span>意味的類似検索(埋め込みモデル対応)</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>🔒</span>
+              <span>ゼロ知識暗号化。サーバーはメモの中身を一切読めません</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span>🔄</span>
+              <span>デスクトップ版・Web版の複数端末で自動同期</span>
+            </li>
+          </ul>
+          <a
+            href="https://zettelnote.top/"
+            className="mt-5 inline-block text-xs font-medium text-indigo-300 hover:text-indigo-200"
           >
-            ログイン
-          </button>
-          <button
-            onClick={() => setRegister(true)}
-            className={`flex-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${
-              register
-                ? 'bg-white/10 text-indigo-300 shadow-sm'
-                : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            新規登録
-          </button>
+            ZettelNoteについて詳しく見る →
+          </a>
         </div>
 
-        <form
-          className="mt-4 space-y-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void submit();
-          }}
-        >
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-medium text-slate-400">
-              アカウント名
+        <div className="w-full max-w-sm justify-self-center rounded-2xl border border-white/10 bg-[#12151f]/95 p-6 shadow-2xl shadow-black/60 backdrop-blur-xl md:justify-self-end">
+          <h2 className="text-lg font-bold text-slate-200">
+            🗂️{' '}
+            <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
+              ZettelNote
             </span>
-            <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder="英数字 3〜32文字"
-              className={inputCls}
-              autoFocus
-            />
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-[11px] font-medium text-slate-400">
-              パスワード
-            </span>
-            <SecretInput value={password} onChange={setPassword} className={inputCls} />
-          </label>
+          </h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Web版はサーバーへのログインが必須です(常時同期のシンクライアント)。
+          </p>
 
-          {error && (
-            <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-400 ring-1 ring-red-500/20">
-              {error}
-            </p>
-          )}
+          <div className="mt-4 flex rounded-xl bg-white/5 p-0.5 text-xs font-medium">
+            <button
+              onClick={() => setRegister(false)}
+              className={`flex-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${
+                !register
+                  ? 'bg-white/10 text-indigo-300 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              ログイン
+            </button>
+            <button
+              onClick={() => setRegister(true)}
+              className={`flex-1 rounded-lg px-2 py-1.5 transition-all duration-200 ${
+                register
+                  ? 'bg-white/10 text-indigo-300 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              新規登録
+            </button>
+          </div>
 
-          <button
-            type="submit"
-            disabled={busy || !username.trim() || !password}
-            className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 enabled:hover:from-indigo-400 enabled:hover:to-indigo-500 enabled:active:scale-[0.98] disabled:opacity-50"
+          <form
+            className="mt-4 space-y-3"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void submit();
+            }}
           >
-            {busy ? '処理中…' : register ? '登録する' : 'ログイン'}
-          </button>
-        </form>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-slate-400">
+                アカウント名
+              </span>
+              <input
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="英数字 3〜32文字"
+                className={inputCls}
+                autoFocus
+              />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-[11px] font-medium text-slate-400">
+                パスワード
+              </span>
+              <SecretInput
+                value={password}
+                onChange={setPassword}
+                className={inputCls}
+              />
+            </label>
+
+            {error && (
+              <p className="rounded-lg bg-red-500/10 px-3 py-2 text-[11px] leading-relaxed text-red-400 ring-1 ring-red-500/20">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={busy || !username.trim() || !password}
+              className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 enabled:hover:from-indigo-400 enabled:hover:to-indigo-500 enabled:active:scale-[0.98] disabled:opacity-50"
+            >
+              {busy ? '処理中…' : register ? '登録する' : 'ログイン'}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );
