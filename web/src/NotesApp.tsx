@@ -672,6 +672,7 @@ export default function NotesApp({
 
       {showModelSettings && (
         <ModelSettingsModal
+          mode={mode}
           activeModelId={activeModelId}
           switching={modelSwitching}
           onSelect={(modelId) => {
