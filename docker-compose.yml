@@ -20,6 +20,10 @@
 #  側では8787番をホストへ公開するだけに留める)
 # ============================================================
 services:
+  # api・api2 は同じイメージ・同じdbに繋がる2台構成(本番のみ)。
+  # k8s/zettelnote.yaml 側でこの2つのホストポート両方をEndpointsに
+  # 登録しており、Serviceがラウンドロビンする。片方ずつ再起動すれば
+  # 常にどちらかが生きたままデプロイできる(scripts/deploy-prod.sh参照)
   api:
     build:
       context: .
@@ -32,6 +36,44 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:8787/api/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  api2:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    ports:
+      - "8791:8787"
+    environment:
+      PORT: 8787
+      DATABASE_URL: postgres://zettel:zettel@db:5432/zettel
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:8787/api/health', r => process.exit(r.statusCode===200?0:1)).on('error', () => process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
   db:
