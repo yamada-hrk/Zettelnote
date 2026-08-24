@@ -24,6 +24,7 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface ConfirmOptions {
   /** モーダル上部の見出し(省略可) */
@@ -53,6 +54,7 @@ interface ActiveConfirm extends ConfirmOptions {
 }
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const [current, setCurrent] = useState<ActiveConfirm | null>(null);
 
   const confirm = useCallback<ConfirmFn>(
@@ -112,7 +114,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                 onClick={() => close(false)}
                 className="rounded-xl px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
               >
-                {current.cancelLabel ?? 'キャンセル'}
+                {current.cancelLabel ?? t('common.cancel')}
               </button>
               <button
                 onClick={() => close(true)}
@@ -123,7 +125,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
                     : 'bg-gradient-to-b from-indigo-500 to-indigo-600 shadow-indigo-950/50 hover:from-indigo-400 hover:to-indigo-500'
                 }`}
               >
-                {current.confirmLabel ?? 'OK'}
+                {current.confirmLabel ?? t('common.ok')}
               </button>
             </div>
           </div>

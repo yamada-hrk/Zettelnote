@@ -5,6 +5,7 @@
 // - レコメンド: 入力停止 600ms 後にバックグラウンドで類似検索
 // ============================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import NoteList from './components/NoteList';
 import Editor from './components/Editor';
 import RecommendSidebar from './components/RecommendSidebar';
@@ -19,6 +20,8 @@ import type { Note, NoteMeta, RecommendResult } from './types';
 export type SaveState = 'idle' | 'dirty' | 'saving' | 'saved';
 
 export default function App() {
+  const { t } = useTranslation();
+
   // ---- メモ一覧・選択状態 ----
   const [notes, setNotes] = useState<NoteMeta[]>([]);
   const [currentId, setCurrentId] = useState<number | null>(null);
@@ -407,9 +410,9 @@ export default function App() {
   const handleDelete = useCallback(async () => {
     if (currentId === null) return;
     const ok = await confirm({
-      title: 'メモの削除',
-      message: 'このメモを削除しますか?この操作は元に戻せません。',
-      confirmLabel: '削除する',
+      title: t('confirm.deleteNoteTitle'),
+      message: t('confirm.deleteNoteMessage'),
+      confirmLabel: t('confirm.deleteNoteConfirm'),
       danger: true,
     });
     if (!ok) return;

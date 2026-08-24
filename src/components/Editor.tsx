@@ -10,6 +10,7 @@
 //   backdrop-blur + 半透明背景 + リング + 深いシャドウで浮遊感を出す。
 // ============================================================
 import { useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import type { SaveState } from '../App';
@@ -34,12 +35,12 @@ interface Props {
   onCreate: () => void;
 }
 
-/** 保存状態 → 表示ラベル */
-const SAVE_LABEL: Record<SaveState, { text: string; className: string }> = {
-  idle: { text: '', className: '' },
-  dirty: { text: '未保存の変更あり…', className: 'text-amber-400/90' },
-  saving: { text: '保存中…', className: 'text-slate-500' },
-  saved: { text: '✓ 保存済み', className: 'text-emerald-400/90' },
+/** 保存状態 → 翻訳キー・表示スタイル */
+const SAVE_LABEL: Record<SaveState, { key: string | null; className: string }> = {
+  idle: { key: null, className: '' },
+  dirty: { key: 'editor.saveDirty', className: 'text-amber-400/90' },
+  saving: { key: 'editor.saving', className: 'text-slate-500' },
+  saved: { key: 'editor.saved', className: 'text-emerald-400/90' },
 };
 
 /** ツールバー内の区切り線 */
@@ -108,6 +109,7 @@ export default function Editor({
   onDelete,
   onCreate,
 }: Props) {
+  const { t } = useTranslation();
   const [preview, setPreview] = useState(false);
 
   // Markdown → HTML(XSS 対策として DOMPurify でサニタイズ)
@@ -121,12 +123,12 @@ export default function Editor({
   if (noteId === null) {
     return (
       <main className="flex flex-1 flex-col items-center justify-center gap-5">
-        <p className="text-sm text-slate-500">メモが選択されていません</p>
+        <p className="text-sm text-slate-500">{t('editor.noSelection')}</p>
         <button
           onClick={onCreate}
           className="rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-5 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 hover:from-indigo-400 hover:to-indigo-500 active:scale-[0.98]"
         >
-          ＋ 最初のメモを作成する
+          {t('editor.createFirstNote')}
         </button>
       </main>
     );
@@ -142,8 +144,8 @@ export default function Editor({
           {/* 左サイドバー(メモ一覧)の開閉 */}
           <button
             onClick={onToggleLeft}
-            title="メモ一覧を開閉 (Ctrl+B)"
-            aria-label="メモ一覧サイドバーを開閉"
+            title={t('editor.toggleLeftTitle')}
+            aria-label={t('editor.toggleLeftAria')}
             className="rounded-lg px-2 py-1.5 text-slate-400 transition-all duration-150 hover:bg-white/10 hover:text-slate-100"
           >
             <PanelGlyph side="left" open={!leftCollapsed} />
@@ -158,8 +160,8 @@ export default function Editor({
             <button
               onClick={onBack}
               disabled={!canGoBack}
-              title="戻る (Alt+←)"
-              aria-label="前のメモに戻る"
+              title={t('editor.backTitle')}
+              aria-label={t('editor.backAria')}
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
             >
               <ChevronIcon direction="left" />
@@ -167,8 +169,8 @@ export default function Editor({
             <button
               onClick={onForward}
               disabled={!canGoForward}
-              title="進む (Alt+→)"
-              aria-label="次のメモに進む"
+              title={t('editor.forwardTitle')}
+              aria-label={t('editor.forwardAria')}
               className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
             >
               <ChevronIcon direction="right" />
@@ -187,7 +189,7 @@ export default function Editor({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              ✏️ 編集
+              {t('editor.edit')}
             </button>
             <button
               onClick={() => setPreview(true)}
@@ -197,7 +199,7 @@ export default function Editor({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              👁 プレビュー
+              {t('editor.preview')}
             </button>
           </div>
 
@@ -207,7 +209,7 @@ export default function Editor({
           <span
             className={`w-28 shrink-0 truncate text-center text-[11px] transition-colors duration-300 ${save.className}`}
           >
-            {save.text}
+            {save.key ? t(save.key) : ''}
           </span>
 
           <Divider />
@@ -216,9 +218,9 @@ export default function Editor({
           <button
             onClick={onDelete}
             className="rounded-lg px-2 py-1 text-xs text-slate-500 transition-colors duration-150 hover:bg-red-500/10 hover:text-red-400"
-            title="このメモを削除"
+            title={t('editor.deleteTitle')}
           >
-            🗑 削除
+            {t('editor.delete')}
           </button>
 
           <Divider />
@@ -226,8 +228,8 @@ export default function Editor({
           {/* 右サイドバー(関連メモ)の開閉 */}
           <button
             onClick={onToggleRight}
-            title="関連メモを開閉 (Ctrl+Shift+B)"
-            aria-label="関連メモサイドバーを開閉"
+            title={t('editor.toggleRightTitle')}
+            aria-label={t('editor.toggleRightAria')}
             className="rounded-lg px-2 py-1.5 text-slate-400 transition-all duration-150 hover:bg-white/10 hover:text-slate-100"
           >
             <PanelGlyph side="right" open={!rightCollapsed} />
@@ -239,7 +241,7 @@ export default function Editor({
       <input
         value={title}
         onChange={(e) => onChangeTitle(e.target.value)}
-        placeholder="タイトルを入力…"
+        placeholder={t('editor.titlePlaceholder')}
         className="border-b border-white/5 bg-transparent px-8 pb-4 pt-[4.4rem] text-2xl font-bold text-slate-100 caret-indigo-400 outline-none placeholder:text-slate-600"
       />
 
@@ -254,7 +256,7 @@ export default function Editor({
         <textarea
           value={body}
           onChange={(e) => onChangeBody(e.target.value)}
-          placeholder="ここに Markdown でメモを書く…&#10;&#10;書き始めると、右のサイドバーに関連メモがリアルタイムで表示されます。"
+          placeholder={t('editor.bodyPlaceholder')}
           className="thin-scrollbar flex-1 resize-none bg-transparent px-8 py-5 font-mono text-sm leading-relaxed text-slate-300 caret-indigo-400 outline-none placeholder:text-slate-600"
           spellCheck={false}
         />

@@ -6,6 +6,7 @@
 // - ダブルクリックで既定の幅にリセット
 // ============================================================
 import type { MouseEvent as ReactMouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   /** どちら側のサイドバーの境界か */
@@ -29,6 +30,7 @@ export default function PanelHandle({
   onResetWidth,
   shortcutHint,
 }: Props) {
+  const { t } = useTranslation();
   // シェブロンの向き: 「押すとパネルが動く方向」を指す
   const chevron =
     side === 'left' ? (collapsed ? '›' : '‹') : collapsed ? '‹' : '›';
@@ -40,7 +42,7 @@ export default function PanelHandle({
       }`}
       onMouseDown={collapsed ? undefined : onResizeStart}
       onDoubleClick={collapsed ? undefined : onResetWidth}
-      title={collapsed ? undefined : 'ドラッグで幅を変更 / ダブルクリックで既定幅'}
+      title={collapsed ? undefined : t('panelHandle.resizeTitle')}
     >
       {/* 境界線本体(ホバー・ドラッグ中はインディゴに発光) */}
       <div
@@ -58,8 +60,8 @@ export default function PanelHandle({
         onClick={onToggle}
         title={
           collapsed
-            ? `サイドバーを開く (${shortcutHint})`
-            : `サイドバーを折りたたむ (${shortcutHint})`
+            ? t('panelHandle.expand', { shortcut: shortcutHint })
+            : t('panelHandle.collapse', { shortcut: shortcutHint })
         }
         className={`absolute top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-white/10 bg-[#12151f]/85 text-[11px] text-slate-500 shadow-lg shadow-black/40 backdrop-blur-xl transition-all duration-200 hover:border-white/20 hover:text-slate-200 ${
           collapsed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'

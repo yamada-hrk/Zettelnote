@@ -13,6 +13,7 @@
 //   そのまま使うため、ResizeObserver 等の追加計測は不要。
 //   ヒステリシス(enter 380 / exit 340)により境界付近でのチラつきを防ぐ。
 // ============================================================
+import { useTranslation } from 'react-i18next';
 import { useThresholdMode } from '../hooks/useThresholdMode';
 import SyncPanel from './SyncPanel';
 import type { NoteMeta } from '../types';
@@ -62,6 +63,7 @@ export default function NoteList({
   onCreate,
   onSelectTag,
 }: Props) {
+  const { t } = useTranslation();
   const cardMode = useThresholdMode(width, CARD_MODE_ENTER, CARD_MODE_EXIT);
   return (
     // 境界線は PanelHandle 側が描画するため、ここでは border を持たない
@@ -74,15 +76,15 @@ export default function NoteList({
         <h1 className="text-sm font-bold tracking-wide text-slate-200">
           🗂️{' '}
           <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-            ツェッテルカステン
+            {t('noteList.heading')}
           </span>
         </h1>
         {cardMode && (
           <span
-            title="ペイン幅を狭めるとリスト表示に戻ります"
+            title={t('noteList.overviewBadgeTitle')}
             className="shrink-0 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] text-violet-300 ring-1 ring-violet-400/25"
           >
-            🗺️ 俯瞰
+            {t('noteList.overviewBadge')}
           </span>
         )}
       </div>
@@ -93,7 +95,7 @@ export default function NoteList({
           onClick={onCreate}
           className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 hover:from-indigo-400 hover:to-indigo-500 active:scale-[0.98]"
         >
-          ＋ 新規メモ
+          {t('noteList.newNote')}
         </button>
       </div>
 
@@ -114,13 +116,13 @@ export default function NoteList({
                 e.currentTarget.blur();
               }
             }}
-            placeholder="検索 (Ctrl+K)"
+            placeholder={t('noteList.searchPlaceholder')}
             className="w-full rounded-lg bg-white/5 py-1.5 pl-8 pr-7 text-sm text-slate-200 ring-1 ring-white/10 outline-none transition-shadow placeholder:text-slate-600 focus:ring-indigo-400/50"
           />
           {searchQuery && (
             <button
               onClick={() => onSearchChange('')}
-              title="検索を解除 (Esc)"
+              title={t('noteList.searchClearTitle')}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded px-1 text-xs text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-200"
             >
               ✕
@@ -130,9 +132,11 @@ export default function NoteList({
         {/* 検索中は件数を表示 */}
         {searchActive && (
           <p className="mt-1.5 px-1 text-[10px] text-slate-500">
-            一致 {notes.length} 件
+            {t('noteList.matchCount', { count: notes.length })}
             {tagFilter && (
-              <span className="text-indigo-300/70">(#{tagFilter} 内)</span>
+              <span className="text-indigo-300/70">
+                {t('noteList.matchCountInTag', { tag: tagFilter })}
+              </span>
             )}
           </p>
         )}
@@ -143,7 +147,7 @@ export default function NoteList({
         <div className="border-b border-white/5 px-3 pb-3">
           <div className="mb-1.5 flex items-center justify-between px-1">
             <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              # タグ
+              {t('noteList.tagsHeading')}
             </span>
             {/* 絞り込み中のみ解除ボタンを表示 */}
             {tagFilter && (
@@ -151,7 +155,7 @@ export default function NoteList({
                 onClick={() => onSelectTag(null)}
                 className="rounded px-1.5 py-0.5 text-[10px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
               >
-                解除 ×
+                {t('noteList.tagsClear')}
               </button>
             )}
           </div>
@@ -163,7 +167,9 @@ export default function NoteList({
                   key={tag}
                   onClick={() => onSelectTag(tag)}
                   title={
-                    active ? '絞り込みを解除' : `#${tag} のメモに絞り込む`
+                    active
+                      ? t('noteList.tagFilterClearTitle')
+                      : t('noteList.tagFilterApplyTitle', { tag })
                   }
                   className={`rounded-full px-2 py-0.5 text-[11px] transition-all duration-200 ${
                     active
@@ -190,21 +196,17 @@ export default function NoteList({
           <p className="px-3 py-6 text-center text-xs leading-relaxed text-slate-500">
             {searchActive ? (
               <>
-                「<span className="text-slate-300">{searchQuery.trim()}</span>」
-                に一致するメモはありません。
+                {t('noteList.emptySearchLine1', { query: searchQuery.trim() })}
                 <br />
-                右の連想結果もあわせて確認してください。
+                {t('noteList.emptySearchLine2')}
               </>
             ) : tagFilter ? (
-              <>
-                <span className="text-indigo-300">#{tagFilter}</span>{' '}
-                のメモはありません。
-              </>
+              t('noteList.emptyTagFilter', { tag: tagFilter })
             ) : (
               <>
-                メモがありません。
+                {t('noteList.emptyDefaultLine1')}
                 <br />
-                「＋ 新規メモ」から作成してください。
+                {t('noteList.emptyDefaultLine2')}
               </>
             )}
           </p>
@@ -249,10 +251,10 @@ export default function NoteList({
                         active ? 'text-indigo-300' : 'text-slate-300'
                       }`}
                     >
-                      {note.title || '(無題)'}
+                      {note.title || t('noteList.untitled')}
                     </div>
                     <div className="mt-0.5 truncate text-xs text-slate-500">
-                      {note.preview || '本文なし'}
+                      {note.preview || t('noteList.noBody')}
                     </div>
                     {/* メモが持つタグ(最大3件 + 残数) */}
                     {note.tags.length > 0 && (
@@ -316,6 +318,7 @@ function NoteCard({
   connections: number;
   onSelect: (id: number) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       onClick={() => onSelect(note.id)}
@@ -333,11 +336,11 @@ function NoteCard({
             active ? 'text-indigo-300' : 'text-slate-200'
           }`}
         >
-          {note.title || '(無題)'}
+          {note.title || t('noteList.untitled')}
         </h3>
         {relevance != null && (
           <span
-            title="編集中のメモとの意味的な近さ(AI連想)"
+            title={t('noteList.relevanceTitle')}
             className="shrink-0 rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] text-indigo-300"
           >
             {Math.round(relevance * 100)}%
@@ -346,7 +349,7 @@ function NoteCard({
       </div>
 
       <p className="mt-1.5 line-clamp-3 flex-1 text-xs leading-relaxed text-slate-500">
-        {note.preview || '本文なし'}
+        {note.preview || t('noteList.noBody')}
       </p>
 
       {note.tags.length > 0 && (
@@ -369,7 +372,7 @@ function NoteCard({
       <div className="mt-2 flex items-center justify-between text-[10px] text-slate-600">
         <span>{note.updated_at}</span>
         {connections > 0 && (
-          <span title={`ハッシュタグで繋がるメモが${connections}件`}>
+          <span title={t('noteList.connectionsTitle', { count: connections })}>
             🔗 {connections}
           </span>
         )}

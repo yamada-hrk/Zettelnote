@@ -25,6 +25,7 @@
 //   挿入し、タグ一致カードには薄いバイオレットの枠でさりげなく差をつける
 // ============================================================
 import { Fragment, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { CSSProperties } from 'react';
 import type { RecommendItem, RecommendMode, RecommendResult } from '../types';
 
@@ -48,6 +49,7 @@ export default function RecommendSidebar({
   searchQuery,
   onOpen,
 }: Props) {
+  const { t } = useTranslation();
   const [mode, setMode] = useState<RecommendMode>('vector');
   const items = mode === 'vector' ? result.vector : result.keyword;
   const queryMode = searchQuery.length > 0;
@@ -66,11 +68,11 @@ export default function RecommendSidebar({
               <>
                 ✨{' '}
                 <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-                  「{searchQuery}」の連想結果
+                  {t('recommend.headerQuery', { query: searchQuery })}
                 </span>
               </>
             ) : (
-              '🔗 関連メモ'
+              t('recommend.headerDefault')
             )}
           </h2>
           {/* 検索中インジケーター(淡く発光) */}
@@ -84,12 +86,12 @@ export default function RecommendSidebar({
           <TabButton
             active={mode === 'vector'}
             onClick={() => setMode('vector')}
-            label="✨ 意味的類似"
+            label={t('recommend.tabSemantic')}
           />
           <TabButton
             active={mode === 'keyword'}
             onClick={() => setMode('keyword')}
-            label="🔤 キーワード"
+            label={t('recommend.tabKeyword')}
           />
         </div>
       </div>
@@ -99,10 +101,10 @@ export default function RecommendSidebar({
         {items.length === 0 ? (
           <p className="px-2 py-8 text-center text-xs leading-relaxed text-slate-500">
             {searching
-              ? '検索中…'
+              ? t('recommend.computing')
               : queryMode
-                ? 'このクエリに近いメモは見つかりませんでした。'
-                : 'メモを書き始めると、ここに関連メモが表示されます。'}
+                ? t('recommend.noResultsQuery')
+                : t('recommend.noResultsDefault')}
           </p>
         ) : (
           <ul className="space-y-1.5">
@@ -120,9 +122,11 @@ export default function RecommendSidebar({
               return (
                 <Fragment key={`${mode}-${item.id}`}>
                   {showTagHeader && (
-                    <GroupHeader label="# タグ一致" tone="violet" />
+                    <GroupHeader label={t('recommend.tagMatchHeader')} tone="violet" />
                   )}
-                  {showPlainHeader && <GroupHeader label="キーワード一致" />}
+                  {showPlainHeader && (
+                    <GroupHeader label={t('recommend.keywordMatchHeader')} />
+                  )}
                   <RecommendCard
                     item={item}
                     rank={rank}
@@ -329,13 +333,14 @@ function SharedTagChips({
   tags?: string[];
   small?: boolean;
 }) {
+  const { t: translate } = useTranslation();
   if (!tags || tags.length === 0) return null;
   return (
     <div className={`flex flex-wrap gap-1 ${small ? 'mt-1 pl-7' : 'mt-1.5'}`}>
       {tags.map((t) => (
         <span
           key={t}
-          title="編集中のメモと同じタグ"
+          title={translate('recommend.sharedTagTitle')}
           className={`rounded-full bg-violet-500/15 text-violet-300 ring-1 ring-violet-400/25 ${
             small ? 'px-1.5 text-[9px]' : 'px-1.5 py-0.5 text-[10px]'
           }`}

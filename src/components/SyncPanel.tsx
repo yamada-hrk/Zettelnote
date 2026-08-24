@@ -12,10 +12,14 @@
 //   * 暗号化キー     … メモの暗号化用。この端末の外へ送信されない
 // ============================================================
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { TFunction } from 'i18next';
 import { useConfirm } from './ConfirmDialog';
+import LanguageSwitcher from './LanguageSwitcher';
 import type { SyncStatus } from '../types';
 
 export default function SyncPanel() {
+  const { t, i18n } = useTranslation();
   const [status, setStatus] = useState<SyncStatus | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -25,7 +29,7 @@ export default function SyncPanel() {
     return window.api.onSyncStatus(setStatus);
   }, []);
 
-  const { dot, label } = describe(status);
+  const { dot, label } = describe(status, t, i18n.resolvedLanguage);
 
   return (
     <div className="border-t border-white/5 px-3 py-2">
@@ -36,11 +40,14 @@ export default function SyncPanel() {
           {label}
         </span>
 
+        {/* 言語切替 */}
+        <LanguageSwitcher />
+
         {/* 今すぐ同期(ログイン済みのときのみ) */}
         {status?.configured && (
           <button
             onClick={() => void window.api.syncNow()}
-            title="今すぐ同期"
+            title={t('sync.syncNowTitle')}
             className="rounded px-1.5 py-0.5 text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-200"
           >
             ⟳
@@ -50,7 +57,7 @@ export default function SyncPanel() {
         {/* 設定モーダルを開く */}
         <button
           onClick={() => setOpen(true)}
-          title="クラウド同期の設定"
+          title={t('sync.settingsTitle')}
           className="rounded px-1.5 py-0.5 text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-200"
         >
           ⚙
@@ -65,28 +72,35 @@ export default function SyncPanel() {
 }
 
 /** ステータス → インジケーターの色とラベル */
-function describe(status: SyncStatus | null): { dot: string; label: string } {
+function describe(
+  status: SyncStatus | null,
+  t: TFunction,
+  lang: string | undefined
+): { dot: string; label: string } {
   if (!status || !status.configured) {
-    return { dot: 'bg-slate-600', label: 'ローカルモード(同期オフ)' };
+    return { dot: 'bg-slate-600', label: t('sync.localModeOff') };
   }
   const who = status.account ? ` @${status.account}` : '';
   if (status.syncing) {
     return {
       dot: 'bg-indigo-400 animate-pulse shadow-[0_0_6px] shadow-indigo-400/60',
-      label: `同期中…${who}`,
+      label: t('sync.syncing', { who }),
     };
   }
   if (status.lastError) {
-    return { dot: 'bg-red-400', label: `エラー: ${status.lastError}` };
+    return {
+      dot: 'bg-red-400',
+      label: t('sync.errorPrefix', { message: status.lastError }),
+    };
   }
   if (status.lastSyncAt) {
-    const time = new Date(status.lastSyncAt).toLocaleTimeString('ja-JP', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    return { dot: 'bg-emerald-400', label: `同期済み ${time}${who}` };
+    const time = new Date(status.lastSyncAt).toLocaleTimeString(
+      lang === 'en' ? 'en-US' : 'ja-JP',
+      { hour: '2-digit', minute: '2-digit' }
+    );
+    return { dot: 'bg-emerald-400', label: t('sync.syncedAt', { time, who }) };
   }
-  return { dot: 'bg-slate-500', label: `同期待機中${who}` };
+  return { dot: 'bg-slate-500', label: t('sync.waiting', { who }) };
 }
 
 // ------------------------------------------------------------
@@ -103,6 +117,7 @@ function SecretInput({
   placeholder?: string;
   className: string;
 }) {
+  const { t } = useTranslation();
   const [visible, setVisible] = useState(false);
   return (
     <div className="relative">
@@ -116,8 +131,10 @@ function SecretInput({
       <button
         type="button"
         onClick={() => setVisible((v) => !v)}
-        title={visible ? '非表示にする' : '表示する'}
-        aria-label={visible ? '入力内容を非表示にする' : '入力内容を表示する'}
+        title={visible ? t('secretInput.hide') : t('secretInput.show')}
+        aria-label={
+          visible ? t('secretInput.hideAria') : t('secretInput.showAria')
+        }
         // tabIndex=-1: Tab 移動で入力欄間の行き来を妨げない
         tabIndex={-1}
         className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded px-1.5 py-0.5 text-xs text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-200"
@@ -138,6 +155,7 @@ function SyncSettingsModal({
   status: SyncStatus | null;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [register, setRegister] = useState(false);
   const [serverUrl, setServerUrl] = useState(
     status?.serverUrl || 'http://localhost:8787'
@@ -172,16 +190,15 @@ function SyncSettingsModal({
     if (res.ok) {
       onClose();
     } else {
-      setError(res.error ?? '設定に失敗しました');
+      setError(res.error ?? t('sync.saveError'));
     }
   };
 
   const disable = async () => {
     const ok = await confirm({
-      title: '同期の解除',
-      message:
-        '同期を解除してローカルモードに戻しますか?ローカルのメモはそのまま残ります。',
-      confirmLabel: '解除する',
+      title: t('sync.disableConfirmTitle'),
+      message: t('sync.disableConfirmMessage'),
+      confirmLabel: t('sync.disableConfirmLabel'),
       danger: true,
     });
     if (!ok) return;
@@ -201,12 +218,11 @@ function SyncSettingsModal({
       }}
     >
       <div className="w-[26rem] rounded-2xl border border-white/10 bg-[#12151f]/95 p-5 shadow-2xl shadow-black/60 backdrop-blur-xl">
-        <h3 className="text-sm font-bold text-slate-200">☁️ クラウド同期(オプション)</h3>
+        <h3 className="text-sm font-bold text-slate-200">{t('sync.heading')}</h3>
         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
-          設定しなくてもアプリはローカルのみで全機能が使えます。
-          同期を有効にすると、メモは
-          <span className="text-slate-300">この端末で暗号化してから</span>
-          サーバーへ送信されます(ゼロ知識暗号化)。
+          {t('sync.descriptionPre')}
+          <span className="text-slate-300">{t('sync.descriptionHighlight')}</span>
+          {t('sync.descriptionPost')}
         </p>
 
         {/* ログイン / 新規登録の切り替え */}
@@ -219,7 +235,7 @@ function SyncSettingsModal({
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            ログイン
+            {t('sync.tabLogin')}
           </button>
           <button
             onClick={() => setRegister(true)}
@@ -229,33 +245,33 @@ function SyncSettingsModal({
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            新規登録
+            {t('sync.tabRegister')}
           </button>
         </div>
 
         <div className="mt-4 space-y-3">
           <label className="block">
-            <span className={labelCls}>サーバー URL</span>
+            <span className={labelCls}>{t('sync.serverUrlLabel')}</span>
             <input
               value={serverUrl}
               onChange={(e) => setServerUrl(e.target.value)}
-              placeholder="http://localhost:8787"
+              placeholder={t('sync.serverUrlPlaceholder')}
               className={inputCls}
             />
           </label>
           <label className="block">
-            <span className={labelCls}>アカウント名</span>
+            <span className={labelCls}>{t('sync.accountNameLabel')}</span>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="英数字 3〜32文字"
+              placeholder={t('sync.accountNamePlaceholder')}
               className={inputCls}
             />
           </label>
           <label className="block">
             <span className={labelCls}>
-              パスワード
-              <span className="ml-1 text-slate-600">(サーバー認証用・8文字以上)</span>
+              {t('sync.passwordLabel')}
+              <span className="ml-1 text-slate-600">{t('sync.passwordHint')}</span>
             </span>
             <SecretInput
               value={password}
@@ -265,13 +281,13 @@ function SyncSettingsModal({
           </label>
           <label className="block">
             <span className={labelCls}>
-              暗号化キー
-              <span className="ml-1 text-slate-600">(パスワードとは別。端末の外に出ません)</span>
+              {t('sync.passphraseLabel')}
+              <span className="ml-1 text-slate-600">{t('sync.passphraseHint')}</span>
             </span>
             <SecretInput
               value={passphrase}
               onChange={setPassphrase}
-              placeholder="忘れるとサーバー上のデータは復元できません"
+              placeholder={t('sync.passphrasePlaceholder')}
               className={inputCls}
             />
           </label>
@@ -289,13 +305,17 @@ function SyncSettingsModal({
             disabled={busy}
             className="rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 enabled:hover:from-indigo-400 enabled:hover:to-indigo-500 enabled:active:scale-[0.98] disabled:opacity-50"
           >
-            {busy ? '接続中…' : register ? '登録して同期を開始' : 'ログインして同期を開始'}
+            {busy
+              ? t('sync.connecting')
+              : register
+                ? t('sync.submitRegister')
+                : t('sync.submitLogin')}
           </button>
           <button
             onClick={onClose}
             className="rounded-xl px-4 py-2 text-sm text-slate-400 transition-colors hover:bg-white/5 hover:text-slate-200"
           >
-            キャンセル
+            {t('sync.cancel')}
           </button>
           <div className="flex-1" />
           {status?.configured && (
@@ -303,7 +323,7 @@ function SyncSettingsModal({
               onClick={() => void disable()}
               className="rounded-xl px-3 py-2 text-xs text-slate-500 transition-colors hover:bg-red-500/10 hover:text-red-400"
             >
-              同期を解除
+              {t('sync.disableSync')}
             </button>
           )}
         </div>
