@@ -11,12 +11,14 @@
 // 承認前に adsbygoogle.js を読み込んでも配信されないため)
 // ============================================================
 import { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /** AdSense管理画面で広告ユニットを作成した後、そのdata-ad-slot値に差し替える */
 const AD_SLOT_ID = '';
 const AD_CLIENT_ID = 'ca-pub-5401885500746261';
 
 export default function LocalAdBanner() {
+  const { t } = useTranslation();
   const insRef = useRef<HTMLModElement>(null);
   const pushed = useRef(false);
 
@@ -36,7 +38,7 @@ export default function LocalAdBanner() {
     // 広告ユニット未作成の間は、レイアウト確認用の枠だけ表示する
     return (
       <div className="flex h-[90px] shrink-0 items-center justify-center border-t border-white/5 bg-white/[0.02] text-[11px] text-slate-600">
-        広告枠(ローカルモード限定・準備中)
+        {t('localAd.placeholder')}
       </div>
     );
   }

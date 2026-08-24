@@ -9,6 +9,7 @@
 // v1 スコープ: デスクトップ版のような順位ごとの情報量グラデーション
 // (リッチ/コンパクト/スリムの3段階)やホバー演出は簡略化している
 // ============================================================
+import { useTranslation } from 'react-i18next';
 import { useRecommend } from './hooks/useRecommend';
 import ModelSwitchBanner from './components/ModelSwitchBanner';
 
@@ -36,6 +37,7 @@ export default function RecommendPanel({
   switchProgress?: { done: number; total: number } | null;
   switchEtaMs?: number | null;
 }) {
+  const { t } = useTranslation();
   const { mode, setMode, items, vectorLoading } = useRecommend(
     queryText,
     excludeUid,
@@ -59,11 +61,11 @@ export default function RecommendPanel({
               <>
                 ✨{' '}
                 <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-                  「{queryText.trim()}」の連想結果
+                  {t('recommend.queryResultTitle', { query: queryText.trim() })}
                 </span>
               </>
             ) : (
-              '🔗 関連メモ'
+              t('recommend.related')
             )}
           </h2>
         </div>
@@ -77,7 +79,7 @@ export default function RecommendPanel({
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            ✨ 意味的類似
+            {t('recommend.semantic')}
           </button>
           <button
             onClick={() => setMode('keyword')}
@@ -87,7 +89,7 @@ export default function RecommendPanel({
                 : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            🔤 キーワード
+            {t('recommend.keyword')}
           </button>
         </div>
       </div>
@@ -99,14 +101,12 @@ export default function RecommendPanel({
         {loading && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 bg-[#0b0d14]/70 text-center text-xs text-slate-400 backdrop-blur-[1px]">
             <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-indigo-400" />
-            <span>計算中…</span>
+            <span>{t('recommend.computing')}</span>
           </div>
         )}
         {items.length === 0 ? (
           <p className="px-2 py-8 text-center text-xs leading-relaxed text-slate-500">
-            {queryText.trim()
-              ? '関連するメモは見つかりませんでした。'
-              : 'メモを書き始めると、ここに関連メモが表示されます。'}
+            {queryText.trim() ? t('recommend.noResults') : t('recommend.startWriting')}
           </p>
         ) : (
           <ul className="space-y-1.5">
@@ -132,13 +132,13 @@ export default function RecommendPanel({
                   {/* 編集中メモ(またはクエリ)と共通のハッシュタグ(バイオレット) */}
                   {item.sharedTags && item.sharedTags.length > 0 && (
                     <div className="mt-1.5 flex flex-wrap gap-1">
-                      {item.sharedTags.map((t) => (
+                      {item.sharedTags.map((tag) => (
                         <span
-                          key={t}
-                          title="編集中のメモと同じタグ"
+                          key={tag}
+                          title={t('recommend.sharedTagTitle')}
                           className="rounded-full bg-violet-500/15 px-1.5 py-0.5 text-[10px] text-violet-300 ring-1 ring-violet-400/25"
                         >
-                          #{t}
+                          #{tag}
                         </span>
                       ))}
                     </div>

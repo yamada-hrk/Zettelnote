@@ -3,6 +3,7 @@
 // デスクトップ版 SyncPanel の設定モーダルと同じ役割・同じ視覚言語
 // ============================================================
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../lib/apiClient';
 import SecretInput from '../components/SecretInput';
 
@@ -19,6 +20,7 @@ export default function LoginScreen({
   /** ローカルモードから遷移してきた場合、ログインせずに戻る */
   onBack?: () => void;
 }) {
+  const { t } = useTranslation();
   const [register, setRegister] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -34,7 +36,7 @@ export default function LoginScreen({
         : await api.login(username.trim(), password);
       onAuthed(auth);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'サーバーに接続できません');
+      setError(e instanceof ApiError ? e.message : t('login.connectError'));
     } finally {
       setBusy(false);
     }
@@ -50,40 +52,38 @@ export default function LoginScreen({
             zettelnote.top のランディングページの要約をここにも置いている) */}
         <div className="px-1">
           <h1 className="text-2xl font-bold text-slate-100 md:text-3xl">
-            書いたメモが、
+            {t('login.heroTitle1')}
             <br />
             <span className="bg-gradient-to-r from-indigo-300 to-violet-300 bg-clip-text text-transparent">
-              自然につながっていく。
+              {t('login.heroTitle2')}
             </span>
           </h1>
           <p className="mt-3 text-sm leading-relaxed text-slate-400">
-            ZettelNoteは、メモを書くたびに関連する過去のメモをリアルタイムで提示する
-            ツェッテルカステン式のメモアプリです。整理するためではなく、つながりを
-            発見するためのメモ帳。
+            {t('login.heroLead')}
           </p>
           <ul className="mt-5 space-y-2.5 text-sm text-slate-300">
             <li className="flex items-start gap-2">
               <span>🔗</span>
-              <span>関連メモをリアルタイムに提示</span>
+              <span>{t('login.feature1')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span>✨</span>
-              <span>意味的類似検索(埋め込みモデル対応)</span>
+              <span>{t('login.feature2')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span>🔒</span>
-              <span>ゼロ知識暗号化。サーバーはメモの中身を一切読めません</span>
+              <span>{t('login.feature3')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span>🔄</span>
-              <span>デスクトップ版・Web版の複数端末で自動同期</span>
+              <span>{t('login.feature4')}</span>
             </li>
           </ul>
           <a
             href="https://zettelnote.top/"
             className="mt-5 inline-block text-xs font-medium text-indigo-300 hover:text-indigo-200"
           >
-            ZettelNoteについて詳しく見る →
+            {t('login.learnMore')}
           </a>
         </div>
 
@@ -93,7 +93,7 @@ export default function LoginScreen({
               onClick={onBack}
               className="mb-3 text-xs text-slate-500 hover:text-slate-300"
             >
-              ← ログインせずに試す(ローカルモード)
+              {t('login.backToLocalMode')}
             </button>
           )}
           <h2 className="text-lg font-bold text-slate-200">
@@ -102,9 +102,7 @@ export default function LoginScreen({
               ZettelNote
             </span>
           </h2>
-          <p className="mt-1 text-xs text-slate-500">
-            Web版はサーバーへのログインが必須です(常時同期のシンクライアント)。
-          </p>
+          <p className="mt-1 text-xs text-slate-500">{t('login.webNotice')}</p>
 
           <div className="mt-4 flex rounded-xl bg-white/5 p-0.5 text-xs font-medium">
             <button
@@ -115,7 +113,7 @@ export default function LoginScreen({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              ログイン
+              {t('login.tabLogin')}
             </button>
             <button
               onClick={() => setRegister(true)}
@@ -125,7 +123,7 @@ export default function LoginScreen({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              新規登録
+              {t('login.tabRegister')}
             </button>
           </div>
 
@@ -138,19 +136,19 @@ export default function LoginScreen({
           >
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-slate-400">
-                アカウント名
+                {t('login.accountName')}
               </span>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                placeholder="英数字 3〜32文字"
+                placeholder={t('login.accountNamePlaceholder')}
                 className={inputCls}
                 autoFocus
               />
             </label>
             <label className="block">
               <span className="mb-1 block text-[11px] font-medium text-slate-400">
-                パスワード
+                {t('login.password')}
               </span>
               <SecretInput
                 value={password}
@@ -170,7 +168,11 @@ export default function LoginScreen({
               disabled={busy || !username.trim() || !password}
               className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 enabled:hover:from-indigo-400 enabled:hover:to-indigo-500 enabled:active:scale-[0.98] disabled:opacity-50"
             >
-              {busy ? '処理中…' : register ? '登録する' : 'ログイン'}
+              {busy
+                ? t('login.submitBusy')
+                : register
+                  ? t('login.submitRegister')
+                  : t('login.submitLogin')}
             </button>
           </form>
         </div>

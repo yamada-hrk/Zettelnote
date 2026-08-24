@@ -3,6 +3,117 @@
     "newNote": "＋ New note",
     "search": "Search",
     "semanticModel": "Semantic similarity model",
-    "loginOrRegister": "Log in / Sign up"
+    "loginOrRegister": "Log in / Sign up",
+    "loading": "Loading…",
+    "noNotes": "No notes yet",
+    "untitled": "(Untitled)",
+    "noBody": "No content",
+    "localMode": "Local mode",
+    "overview": "Overview"
+  },
+  "sidebar": {
+    "forgetKey": "🔒 Forget saved key",
+    "forgetKeyTitle": "Removes the encryption key saved in this browser and asks you to re-enter it next time on the unlock screen",
+    "logout": "Log out"
+  },
+  "editor": {
+    "backToList": "List",
+    "back": "Back (Alt+←)",
+    "backAria": "Go to previous note",
+    "forward": "Forward (Alt+→)",
+    "forwardAria": "Go to next note",
+    "edit": "Edit",
+    "preview": "Preview",
+    "saving": "Saving…",
+    "saved": "✓ Saved",
+    "delete": "Delete",
+    "titlePlaceholder": "Enter a title…",
+    "bodyPlaceholder": "Write your note in Markdown…",
+    "noSelection": "No note selected",
+    "deleteConfirm": "Delete this note?"
+  },
+  "recommend": {
+    "computing": "Computing…",
+    "noResults": "No related notes found.",
+    "startWriting": "Related notes will show up here once you start writing.",
+    "related": "🔗 Related notes",
+    "relatedShort": "🔗 Related",
+    "semantic": "✨ Semantic",
+    "keyword": "🔤 Keyword",
+    "queryResultTitle": "Related to “{{query}}”",
+    "sharedTagTitle": "Same tag as the note you're editing"
+  },
+  "modelSwitch": {
+    "updating": "Updating the similarity model… ({{done}} / {{total}}{{eta}})",
+    "etaSuffix": ", about {{eta}} left",
+    "etaSeconds": "{{count}}s",
+    "etaMinutes": "{{count}}m"
+  },
+  "modelSettings": {
+    "title": "🧠 Semantic similarity model",
+    "descriptionAccount": "Switching applies to every device on this account and starts recomputing all notes.",
+    "descriptionLocal": "Switching starts recomputing all notes on this device (local mode has no other devices to affect).",
+    "inUse": "In use",
+    "confirmSwitch": "Switch to “{{label}}”?\nThis recomputes every note (can take anywhere from a few seconds to a few minutes depending on the model).",
+    "close": "Close"
+  },
+  "models": {
+    "bigram": {
+      "label": "Lightweight (bigram)",
+      "description": "Virtually no download or compute cost. Finds notes with similar wording."
+    },
+    "mpnet": {
+      "label": "High-accuracy (multilingual)",
+      "description": "Downloads a ~280MB model on first use. Finds notes with similar meaning, even across languages."
+    }
+  },
+  "login": {
+    "heroTitle1": "Notes that",
+    "heroTitle2": "connect themselves.",
+    "heroLead": "ZettelNote is a Zettelkasten-style note app that surfaces related notes in real time as you write. Not a filing system — a way to discover connections.",
+    "feature1": "Real-time related notes",
+    "feature2": "Semantic search (embedding models supported)",
+    "feature3": "Zero-knowledge encryption — we can't read your notes",
+    "feature4": "Automatic sync across desktop and web",
+    "learnMore": "Learn more about ZettelNote →",
+    "webNotice": "The web app requires a server login (it's an always-synced thin client).",
+    "tabLogin": "Log in",
+    "tabRegister": "Sign up",
+    "accountName": "Account name",
+    "accountNamePlaceholder": "3–32 letters or digits",
+    "password": "Password",
+    "submitBusy": "Working…",
+    "submitRegister": "Sign up",
+    "submitLogin": "Log in",
+    "backToLocalMode": "← Try it without logging in (local mode)",
+    "connectError": "Couldn't reach the server"
+  },
+  "unlock": {
+    "title": "🔐 Enter your encryption key",
+    "notice": "Logged in as @{{username}}. Enter the encryption key to decrypt your notes.",
+    "passphrase": "Encryption key (passphrase)",
+    "remember": "Remember on this browser (skips this step next time — leave unchecked on shared or public devices)",
+    "checking": "Checking…",
+    "unlock": "Unlock",
+    "logout": "Log out",
+    "keyMismatch": "That key doesn't match (it's different from the one used for this account's existing data)",
+    "connectError": "Couldn't reach the server"
+  },
+  "secretInput": {
+    "show": "Show",
+    "hide": "Hide",
+    "showAria": "Show input",
+    "hideAria": "Hide input"
+  },
+  "panelHandle": {
+    "resizeTitle": "Drag to resize / double-click to reset width",
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar"
+  },
+  "localAd": {
+    "placeholder": "Ad space (local mode only, coming soon)"
+  },
+  "apiClient": {
+    "serverError": "Server error (HTTP {{status}})"
   }
 }

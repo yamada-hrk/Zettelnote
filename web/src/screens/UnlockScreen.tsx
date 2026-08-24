@@ -15,6 +15,7 @@
 //   3. 入力されたパスフレーズで鍵を導出し、keyCheck で正誤を検証
 // ============================================================
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api, ApiError } from '../lib/apiClient';
 import { deriveKey, generateSalt, makeKeyCheck, verifyKeyCheck } from '../lib/webCrypto';
 import { saveKey } from '../lib/keyStore';
@@ -31,6 +32,7 @@ export default function UnlockScreen({
   onUnlocked: (key: CryptoKey) => void;
   onLogout: () => void;
 }) {
+  const { t } = useTranslation();
   const [passphrase, setPassphrase] = useState('');
   const [remember, setRemember] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -50,12 +52,12 @@ export default function UnlockScreen({
       }
       const key = await deriveKey(passphrase, meta.salt);
       if (!(await verifyKeyCheck(key, meta.keyCheck))) {
-        throw new ApiError('暗号化キーが一致しません(このアカウントの既存データと異なるキーです)');
+        throw new ApiError(t('unlock.keyMismatch'));
       }
       if (remember) await saveKey(username, key);
       onUnlocked(key);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'サーバーに接続できません');
+      setError(e instanceof ApiError ? e.message : t('unlock.connectError'));
     } finally {
       setBusy(false);
     }
@@ -64,9 +66,9 @@ export default function UnlockScreen({
   return (
     <div className="flex h-full items-center justify-center px-4">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#12151f]/95 p-6 shadow-2xl shadow-black/60 backdrop-blur-xl">
-        <h1 className="text-sm font-bold text-slate-200">🔐 暗号化キーの入力</h1>
+        <h1 className="text-sm font-bold text-slate-200">{t('unlock.title')}</h1>
         <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
-          @{username} としてログイン中。メモを復号するための暗号化キーを入力してください。
+          {t('unlock.notice', { username })}
         </p>
 
         <form
@@ -79,7 +81,7 @@ export default function UnlockScreen({
           <SecretInput
             value={passphrase}
             onChange={setPassphrase}
-            placeholder="暗号化キー(パスフレーズ)"
+            placeholder={t('unlock.passphrase')}
             autoFocus
             className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-slate-200 ring-1 ring-white/10 outline-none transition-shadow placeholder:text-slate-600 focus:ring-indigo-400/50"
           />
@@ -91,10 +93,7 @@ export default function UnlockScreen({
               onChange={(e) => setRemember(e.target.checked)}
               className="mt-0.5 accent-indigo-500"
             />
-            <span>
-              このブラウザに保存する(次回から入力不要になります。共有・公共の端末では
-              チェックを外してください)
-            </span>
+            <span>{t('unlock.remember')}</span>
           </label>
 
           {error && (
@@ -108,14 +107,14 @@ export default function UnlockScreen({
             disabled={busy || !passphrase}
             className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 enabled:hover:from-indigo-400 enabled:hover:to-indigo-500 enabled:active:scale-[0.98] disabled:opacity-50"
           >
-            {busy ? '確認中…' : '解除する'}
+            {busy ? t('unlock.checking') : t('unlock.unlock')}
           </button>
           <button
             type="button"
             onClick={onLogout}
             className="w-full rounded-xl px-4 py-2 text-xs text-slate-500 transition-colors hover:bg-white/5 hover:text-slate-300"
           >
-            ログアウト
+            {t('unlock.logout')}
           </button>
         </form>
       </div>

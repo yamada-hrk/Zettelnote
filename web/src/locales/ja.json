@@ -3,6 +3,117 @@
     "newNote": "＋ 新規メモ",
     "search": "検索",
     "semanticModel": "意味的類似のモデル",
-    "loginOrRegister": "ログイン / アカウント登録"
+    "loginOrRegister": "ログイン / アカウント登録",
+    "loading": "読み込み中…",
+    "noNotes": "メモがありません",
+    "untitled": "(無題)",
+    "noBody": "本文なし",
+    "localMode": "ローカルモード",
+    "overview": "俯瞰"
+  },
+  "sidebar": {
+    "forgetKey": "🔒 キーの記憶を削除",
+    "forgetKeyTitle": "このブラウザに保存した暗号化キーを削除し、次回アンロック画面で再入力を求めます",
+    "logout": "ログアウト"
+  },
+  "editor": {
+    "backToList": "一覧",
+    "back": "戻る (Alt+←)",
+    "backAria": "前のメモに戻る",
+    "forward": "進む (Alt+→)",
+    "forwardAria": "次のメモに進む",
+    "edit": "編集",
+    "preview": "プレビュー",
+    "saving": "保存中…",
+    "saved": "✓ 保存済み",
+    "delete": "削除",
+    "titlePlaceholder": "タイトルを入力…",
+    "bodyPlaceholder": "ここに Markdown でメモを書く…",
+    "noSelection": "メモが選択されていません",
+    "deleteConfirm": "このメモを削除しますか?"
+  },
+  "recommend": {
+    "computing": "計算中…",
+    "noResults": "関連するメモは見つかりませんでした。",
+    "startWriting": "メモを書き始めると、ここに関連メモが表示されます。",
+    "related": "🔗 関連メモ",
+    "relatedShort": "🔗 関連",
+    "semantic": "✨ 意味的類似",
+    "keyword": "🔤 キーワード",
+    "queryResultTitle": "「{{query}}」の連想結果",
+    "sharedTagTitle": "編集中のメモと同じタグ"
+  },
+  "modelSwitch": {
+    "updating": "類似度モデルを更新中… ({{done}} / {{total}}件{{eta}})",
+    "etaSuffix": "、残り約{{eta}}",
+    "etaSeconds": "{{count}}秒",
+    "etaMinutes": "{{count}}分"
+  },
+  "modelSettings": {
+    "title": "🧠 意味的類似のモデル",
+    "descriptionAccount": "切り替えると、このアカウントの全端末に反映され、全メモの再計算が始まります。",
+    "descriptionLocal": "切り替えると、この端末上で全メモの再計算が始まります(ローカルモードのため他端末には影響しません)。",
+    "inUse": "使用中",
+    "confirmSwitch": "「{{label}}」に切り替えますか?\n全メモの再計算が始まります(モデルによっては数十秒〜数分かかります)。",
+    "close": "閉じる"
+  },
+  "models": {
+    "bigram": {
+      "label": "超軽量(バイグラム)",
+      "description": "ダウンロード・計算コストほぼゼロ。文字の並びが似ているメモ同士を検出する"
+    },
+    "mpnet": {
+      "label": "高精度(多言語)",
+      "description": "初回は約280MBのモデルをダウンロード。語彙が違っても意味が近いメモを検出できる"
+    }
+  },
+  "login": {
+    "heroTitle1": "書いたメモが、",
+    "heroTitle2": "自然につながっていく。",
+    "heroLead": "ZettelNoteは、メモを書くたびに関連する過去のメモをリアルタイムで提示するツェッテルカステン式のメモアプリです。整理するためではなく、つながりを発見するためのメモ帳。",
+    "feature1": "関連メモをリアルタイムに提示",
+    "feature2": "意味的類似検索(埋め込みモデル対応)",
+    "feature3": "ゼロ知識暗号化。サーバーはメモの中身を一切読めません",
+    "feature4": "デスクトップ版・Web版の複数端末で自動同期",
+    "learnMore": "ZettelNoteについて詳しく見る →",
+    "webNotice": "Web版はサーバーへのログインが必須です(常時同期のシンクライアント)。",
+    "tabLogin": "ログイン",
+    "tabRegister": "新規登録",
+    "accountName": "アカウント名",
+    "accountNamePlaceholder": "英数字 3〜32文字",
+    "password": "パスワード",
+    "submitBusy": "処理中…",
+    "submitRegister": "登録する",
+    "submitLogin": "ログイン",
+    "backToLocalMode": "← ログインせずに試す(ローカルモード)",
+    "connectError": "サーバーに接続できません"
+  },
+  "unlock": {
+    "title": "🔐 暗号化キーの入力",
+    "notice": "@{{username}} としてログイン中。メモを復号するための暗号化キーを入力してください。",
+    "passphrase": "暗号化キー(パスフレーズ)",
+    "remember": "このブラウザに保存する(次回から入力不要になります。共有・公共の端末ではチェックを外してください)",
+    "checking": "確認中…",
+    "unlock": "解除する",
+    "logout": "ログアウト",
+    "keyMismatch": "暗号化キーが一致しません(このアカウントの既存データと異なるキーです)",
+    "connectError": "サーバーに接続できません"
+  },
+  "secretInput": {
+    "show": "表示する",
+    "hide": "非表示にする",
+    "showAria": "入力内容を表示する",
+    "hideAria": "入力内容を非表示にする"
+  },
+  "panelHandle": {
+    "resizeTitle": "ドラッグで幅を変更 / ダブルクリックで既定幅",
+    "expand": "サイドバーを開く",
+    "collapse": "サイドバーを折りたたむ"
+  },
+  "localAd": {
+    "placeholder": "広告枠(ローカルモード限定・準備中)"
+  },
+  "apiClient": {
+    "serverError": "サーバーエラー (HTTP {{status}})"
   }
 }

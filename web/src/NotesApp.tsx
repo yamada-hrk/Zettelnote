@@ -84,7 +84,6 @@ export default function NotesApp({
   /** ローカルモードから、ログイン/新規登録画面へ切り替える(localモードのみ) */
   onRequestLogin?: () => void;
 }) {
-  // フェーズ2時点では一部の文言のみ翻訳キー化している(大半はフェーズ3で対応)
   const { t } = useTranslation();
   const [showModelSettings, setShowModelSettings] = useState(false);
 
@@ -282,7 +281,7 @@ export default function NotesApp({
 
   const handleDelete = async () => {
     if (!selected) return;
-    if (!confirm('このメモを削除しますか?')) return;
+    if (!confirm(t('editor.deleteConfirm'))) return;
     await remove(selected.uid);
     history.remove(selected.uid); // 削除済みメモを履歴からも取り除く
     setSelectedUid(null); // 次のメモは自動選択effectがselectNote経由で履歴に記録する
@@ -334,7 +333,7 @@ export default function NotesApp({
                 </span>
                 {cardMode && (
                   <span className="ml-2 rounded-full bg-violet-500/15 px-2 py-0.5 text-[10px] font-normal text-violet-300 ring-1 ring-violet-400/25">
-                    🗺️ 俯瞰
+                    🗺️ {t('common.overview')}
                   </span>
                 )}
               </h1>
@@ -342,7 +341,7 @@ export default function NotesApp({
                 <span className="text-[10px] text-slate-500">@{username}</span>
               ) : (
                 <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-[10px] font-medium text-indigo-300 ring-1 ring-indigo-400/25">
-                  ローカルモード
+                  {t('common.localMode')}
                 </span>
               )}
             </div>
@@ -368,7 +367,7 @@ export default function NotesApp({
             <nav className="thin-scrollbar flex-1 overflow-y-auto px-2 pb-3">
               {loading && (
                 <p className="px-3 py-6 text-center text-xs text-slate-500">
-                  読み込み中…
+                  {t('common.loading')}
                 </p>
               )}
               {error && (
@@ -378,7 +377,7 @@ export default function NotesApp({
               )}
               {!loading && visibleNotes.length === 0 && (
                 <p className="px-3 py-6 text-center text-xs text-slate-500">
-                  メモがありません
+                  {t('common.noNotes')}
                 </p>
               )}
               {cardMode ? (
@@ -418,10 +417,10 @@ export default function NotesApp({
                           <div
                             className={`truncate text-sm font-medium ${active ? 'text-indigo-300' : 'text-slate-300'}`}
                           >
-                            {note.title || '(無題)'}
+                            {note.title || t('common.untitled')}
                           </div>
                           <div className="mt-0.5 truncate text-xs text-slate-500">
-                            {note.body.slice(0, 60) || '本文なし'}
+                            {note.body.slice(0, 60) || t('common.noBody')}
                           </div>
                           {tags.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
@@ -455,16 +454,16 @@ export default function NotesApp({
                 <>
                   <button
                     onClick={onForgetKey}
-                    title="このブラウザに保存した暗号化キーを削除し、次回アンロック画面で再入力を求めます"
+                    title={t('sidebar.forgetKeyTitle')}
                     className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
                   >
-                    🔒 キーの記憶を削除
+                    {t('sidebar.forgetKey')}
                   </button>
                   <button
                     onClick={onLogout}
                     className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
                   >
-                    ログアウト
+                    {t('sidebar.logout')}
                   </button>
                 </>
               ) : (
@@ -510,7 +509,7 @@ export default function NotesApp({
                     onClick={() => setMobileView('list')}
                     className="flex h-8 shrink-0 items-center gap-1 rounded-lg bg-white/5 px-2.5 text-xs font-medium text-slate-300 ring-1 ring-white/5 transition-colors hover:bg-white/10 hover:text-slate-100"
                   >
-                    <ChevronIcon direction="left" /> 一覧
+                    <ChevronIcon direction="left" /> {t('editor.backToList')}
                   </button>
                 )}
                 {/* 戻る / 進む(閲覧履歴のナビゲーション。デスクトップ版 Editor.tsx と同一の見た目) */}
@@ -519,8 +518,8 @@ export default function NotesApp({
                     <button
                       onClick={handleBack}
                       disabled={!history.canGoBack}
-                      title="戻る (Alt+←)"
-                      aria-label="前のメモに戻る"
+                      title={t('editor.back')}
+                      aria-label={t('editor.backAria')}
                       className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
                     >
                       <ChevronIcon direction="left" />
@@ -528,8 +527,8 @@ export default function NotesApp({
                     <button
                       onClick={handleForward}
                       disabled={!history.canGoForward}
-                      title="進む (Alt+→)"
-                      aria-label="次のメモに進む"
+                      title={t('editor.forward')}
+                      aria-label={t('editor.forwardAria')}
                       className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-slate-300 ring-1 ring-white/5 transition-all duration-150 enabled:hover:bg-white/10 enabled:hover:text-slate-100 enabled:hover:ring-white/10 enabled:active:scale-95 disabled:cursor-default disabled:bg-transparent disabled:text-slate-700 disabled:ring-transparent"
                     >
                       <ChevronIcon direction="right" />
@@ -549,7 +548,7 @@ export default function NotesApp({
                         : 'text-slate-500 hover:text-slate-300'
                     }`}
                   >
-                    ✏️ 編集
+                    ✏️ {t('editor.edit')}
                   </button>
                   <button
                     onClick={() => setPreview(true)}
@@ -559,15 +558,15 @@ export default function NotesApp({
                         : 'text-slate-500 hover:text-slate-300'
                     }`}
                   >
-                    👁 プレビュー
+                    👁 {t('editor.preview')}
                   </button>
                 </div>
 
                 <span className="text-xs text-slate-500">
                   {saveState === 'saving'
-                    ? '保存中…'
+                    ? t('editor.saving')
                     : saveState === 'saved'
-                      ? '✓ 保存済み'
+                      ? t('editor.saved')
                       : ''}
                 </span>
                 <div className="flex-1" />
@@ -575,7 +574,7 @@ export default function NotesApp({
                   onClick={() => void handleDelete()}
                   className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
                 >
-                  🗑 削除
+                  🗑 {t('editor.delete')}
                 </button>
               </div>
               <input
@@ -585,7 +584,7 @@ export default function NotesApp({
                   setSaveState('dirty');
                   if (selected) dirtyUidRef.current = selected.uid;
                 }}
-                placeholder="タイトルを入力…"
+                placeholder={t('editor.titlePlaceholder')}
                 className="border-b border-white/5 bg-transparent px-6 py-4 text-xl font-bold text-slate-100 outline-none placeholder:text-slate-600"
               />
               {preview ? (
@@ -602,7 +601,7 @@ export default function NotesApp({
                     setSaveState('dirty');
                     if (selected) dirtyUidRef.current = selected.uid;
                   }}
-                  placeholder="ここに Markdown でメモを書く…"
+                  placeholder={t('editor.bodyPlaceholder')}
                   className="thin-scrollbar flex-1 resize-none bg-transparent px-6 py-4 font-mono text-sm leading-relaxed text-slate-300 outline-none placeholder:text-slate-600"
                   spellCheck={false}
                 />
@@ -622,7 +621,7 @@ export default function NotesApp({
             </>
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-slate-500">
-              メモが選択されていません
+              {t('editor.noSelection')}
             </div>
           )}
         </main>
@@ -704,6 +703,7 @@ function NoteCard({
   active: boolean;
   onSelect: (uid: string) => void;
 }) {
+  const { t } = useTranslation();
   const tags = extractTags(note.body);
   return (
     <button
@@ -717,10 +717,10 @@ function NoteCard({
       <h3
         className={`truncate text-sm font-semibold ${active ? 'text-indigo-300' : 'text-slate-200'}`}
       >
-        {note.title || '(無題)'}
+        {note.title || t('common.untitled')}
       </h3>
       <p className="mt-1.5 line-clamp-3 flex-1 text-xs leading-relaxed text-slate-500">
-        {note.body || '本文なし'}
+        {note.body || t('common.noBody')}
       </p>
       {tags.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1">

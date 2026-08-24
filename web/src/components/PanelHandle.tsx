@@ -5,6 +5,7 @@
 // - ダブルクリックで既定の幅にリセット
 // ============================================================
 import type { MouseEvent as ReactMouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface Props {
   side: 'left' | 'right';
@@ -23,6 +24,7 @@ export default function PanelHandle({
   onToggle,
   onResetWidth,
 }: Props) {
+  const { t } = useTranslation();
   const chevron =
     side === 'left' ? (collapsed ? '›' : '‹') : collapsed ? '‹' : '›';
 
@@ -33,7 +35,7 @@ export default function PanelHandle({
       }`}
       onMouseDown={collapsed ? undefined : onResizeStart}
       onDoubleClick={collapsed ? undefined : onResetWidth}
-      title={collapsed ? undefined : 'ドラッグで幅を変更 / ダブルクリックで既定幅'}
+      title={collapsed ? undefined : t('panelHandle.resizeTitle')}
     >
       <div
         className={`h-full w-px transition-colors duration-150 ${
@@ -47,7 +49,7 @@ export default function PanelHandle({
         onMouseDown={(e) => e.stopPropagation()}
         onDoubleClick={(e) => e.stopPropagation()}
         onClick={onToggle}
-        title={collapsed ? 'サイドバーを開く' : 'サイドバーを折りたたむ'}
+        title={collapsed ? t('panelHandle.expand') : t('panelHandle.collapse')}
         className={`absolute top-1/2 z-10 flex h-10 w-4 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md border border-white/10 bg-[#12151f]/85 text-[11px] text-slate-500 shadow-lg shadow-black/40 backdrop-blur-xl transition-all duration-200 hover:border-white/20 hover:text-slate-200 ${
           collapsed ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         }`}

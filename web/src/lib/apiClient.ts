@@ -6,6 +6,7 @@
 // 完全に同じ(register/login/meta/notes)なので、デスクトップ版の
 // サーバーをそのまま Web版からも利用できる。
 // ============================================================
+import i18n from './i18n';
 
 export class ApiError extends Error {}
 
@@ -26,7 +27,9 @@ async function request<T>(
   if (res.status === 404) return null as T;
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
-    throw new ApiError(detail?.error || `サーバーエラー (HTTP ${res.status})`);
+    throw new ApiError(
+      detail?.error || i18n.t('apiClient.serverError', { status: res.status }),
+    );
   }
   return res.json();
 }

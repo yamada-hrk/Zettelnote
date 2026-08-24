@@ -9,12 +9,7 @@
 // RecommendPanel(デスクトップ)・MobileRecommendStrip(スマホ)の
 // 両方から使う共通部品
 // ============================================================
-function formatEta(ms: number): string {
-  const totalSec = Math.ceil(ms / 1000);
-  if (totalSec < 60) return `${totalSec}秒`;
-  const min = Math.ceil(totalSec / 60);
-  return `${min}分`;
-}
+import { useTranslation } from 'react-i18next';
 
 export default function ModelSwitchBanner({
   progress,
@@ -23,14 +18,27 @@ export default function ModelSwitchBanner({
   progress: { done: number; total: number } | null;
   etaMs: number | null;
 }) {
+  const { t } = useTranslation();
   if (!progress) return null;
   const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+
+  const formatEta = (ms: number): string => {
+    const totalSec = Math.ceil(ms / 1000);
+    if (totalSec < 60) return t('modelSwitch.etaSeconds', { count: totalSec });
+    return t('modelSwitch.etaMinutes', { count: Math.ceil(totalSec / 60) });
+  };
 
   return (
     <div className="border-b border-white/5 bg-white/[0.03] px-3 py-2">
       <p className="text-[11px] text-slate-400">
-        類似度モデルを更新中… ({progress.done} / {progress.total}件
-        {etaMs != null && etaMs > 0 ? `、残り約${formatEta(etaMs)}` : ''})
+        {t('modelSwitch.updating', {
+          done: progress.done,
+          total: progress.total,
+          eta:
+            etaMs != null && etaMs > 0
+              ? t('modelSwitch.etaSuffix', { eta: formatEta(etaMs) })
+              : '',
+        })}
       </p>
       <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
         <div
