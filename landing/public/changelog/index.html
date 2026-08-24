@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>更新履歴 — ZettelNote</title>
+<meta name="description" content="ZettelNoteの更新履歴。意味的類似検索、ローカルモード、同期の改善など、実際の開発の記録です。" />
+<link rel="icon" href="../assets/favicon-32.png" />
+<link rel="stylesheet" href="../style.css" />
+</head>
+<body>
+
+<header class="hero" style="padding-bottom: 2rem;">
+  <nav class="nav">
+    <div class="brand">
+      <img src="../assets/favicon-32.png" alt="" width="24" height="24" />
+      <span>ZettelNote</span>
+    </div>
+    <a class="nav-cta" href="https://app.zettelnote.top/">アプリを開く</a>
+  </nav>
+
+  <div class="hero-inner" style="padding-top: 2.5rem;">
+    <h1 style="font-size: clamp(1.6rem, 4vw, 2.2rem);">更新履歴</h1>
+    <p class="hero-lead">
+      ZettelNoteの開発の記録です。宣伝目的の記事ではなく、実際に加わった機能・
+      直した不具合をそのまま載せています。
+    </p>
+  </div>
+</header>
+
+<main>
+<section class="section" style="max-width: 720px;">
+
+  <div class="how-block">
+    <h3>2026年8月 — 本番環境の冗長化</h3>
+    <p>
+      APIサーバーを2台構成にし、デプロイ時に1台ずつ順番に更新することで、
+      サービスを止めずにアップデートできるようにしました。
+    </p>
+  </div>
+
+  <div class="how-block">
+    <h3>2026年8月 — ローカルモード(未ログイン体験)を追加</h3>
+    <p>
+      アカウント登録前でも、実際にメモの作成・関連メモ機能を試せる
+      ローカルモードを追加しました。この端末のブラウザ内にのみ保存され、
+      サーバーへは送信されません。
+    </p>
+  </div>
+
+  <div class="how-block">
+    <h3>2026年8月 — 同期の不具合を修正</h3>
+    <p>
+      複数端末を使っている際に、他端末での更新が反映されないことがある
+      不具合を2件特定・修正しました。サーバー側のPull処理にあった競合状態と、
+      開いたままのメモがバックグラウンド同期後も画面に反映されない不具合です。
+      あわせて、Web版に60秒間隔の自動同期を追加しました。
+    </p>
+  </div>
+
+  <div class="how-block">
+    <h3>2026年8月 — 意味的類似検索を追加</h3>
+    <p>
+      キーワードが一致しなくても意味が近いメモを検出できる、埋め込みモデルに
+      よる検索に対応しました。軽量なバイグラム検索と、多言語対応の高精度モデル
+      (初回ダウンロードあり)から選べます。モデル切り替え時は進捗状況を
+      画面に表示します。
+    </p>
+  </div>
+
+  <div class="how-block">
+    <h3>それ以前</h3>
+    <p>
+      ツェッテルカステン式のメモ管理・関連メモのリアルタイム提示・
+      ゼロ知識暗号化・デスクトップ版(Electron)とWeb版(PWA)の両対応など、
+      ZettelNoteの基本機能を実装。
+    </p>
+  </div>
+
+</section>
+</main>
+
+<footer class="footer">
+  <p><a href="../">トップに戻る</a></p>
+</footer>
+
+</body>
+</html>
