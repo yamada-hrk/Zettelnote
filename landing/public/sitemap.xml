@@ -1,9 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
     <loc>https://zettelnote.top/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zettelnote.top/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://zettelnote.top/en/" />
+  </url>
+  <url>
+    <loc>https://zettelnote.top/en/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zettelnote.top/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://zettelnote.top/en/" />
   </url>
   <url>
     <loc>https://zettelnote.top/changelog/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zettelnote.top/changelog/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://zettelnote.top/en/changelog/" />
+  </url>
+  <url>
+    <loc>https://zettelnote.top/en/changelog/</loc>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://zettelnote.top/changelog/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://zettelnote.top/en/changelog/" />
   </url>
 </urlset>
