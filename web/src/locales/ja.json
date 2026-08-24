@@ -115,5 +115,18 @@
   },
   "apiClient": {
     "serverError": "サーバーエラー (HTTP {{status}})"
+  },
+  "errors": {
+    "AUTH_RATE_LIMITED": "試行回数が上限に達しました。15分ほど待ってからやり直してください",
+    "RATE_LIMITED": "リクエストが多すぎます。しばらく待ってからやり直してください",
+    "INVALID_USERNAME": "アカウント名は3〜32文字の英数字・ハイフン・アンダースコアで入力してください",
+    "INVALID_PASSWORD": "パスワードは8文字以上で入力してください",
+    "USERNAME_TAKEN": "このアカウント名は既に使われています",
+    "INVALID_CREDENTIALS": "アカウント名またはパスワードが違います",
+    "LOGIN_REQUIRED": "ログインが必要です",
+    "SESSION_INVALID": "セッションが無効です。再ログインしてください",
+    "NOT_INITIALIZED": "まだ初期化されていません",
+    "INVALID_INPUT": "入力内容が不正です",
+    "INTERNAL_ERROR": "サーバー内部エラー"
   }
 }

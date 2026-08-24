@@ -105,6 +105,7 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     error: '試行回数が上限に達しました。15分ほど待ってからやり直してください',
+    errorCode: 'AUTH_RATE_LIMITED',
   },
 });
 
@@ -116,6 +117,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: {
     error: 'リクエストが多すぎます。しばらく待ってからやり直してください',
+    errorCode: 'RATE_LIMITED',
   },
 });
 
@@ -133,10 +135,13 @@ async function issueToken(userId) {
 
 function validateCredentials(username, password) {
   if (typeof username !== 'string' || !/^[a-z0-9_-]{3,32}$/i.test(username)) {
-    return 'アカウント名は3〜32文字の英数字・ハイフン・アンダースコアで入力してください';
+    return {
+      code: 'INVALID_USERNAME',
+      message: 'アカウント名は3〜32文字の英数字・ハイフン・アンダースコアで入力してください',
+    };
   }
   if (typeof password !== 'string' || password.length < 8) {
-    return 'パスワードは8文字以上で入力してください';
+    return { code: 'INVALID_PASSWORD', message: 'パスワードは8文字以上で入力してください' };
   }
   return null;
 }
@@ -147,14 +152,19 @@ app.post(
   ah(async (req, res) => {
     const { username, password } = req.body || {};
     const invalid = validateCredentials(username, password);
-    if (invalid) return res.status(400).json({ error: invalid });
+    if (invalid) {
+      return res.status(400).json({ error: invalid.message, errorCode: invalid.code });
+    }
     const r = await pool.query(
       `INSERT INTO users (username, pass_hash, created_ms) VALUES ($1, $2, $3)
        ON CONFLICT (username) DO NOTHING RETURNING id`,
       [username.toLowerCase(), hashPassword(password), Date.now()]
     );
     if (r.rows.length === 0) {
-      return res.status(409).json({ error: 'このアカウント名は既に使われています' });
+      return res.status(409).json({
+        error: 'このアカウント名は既に使われています',
+        errorCode: 'USERNAME_TAKEN',
+      });
     }
     res.json({ token: await issueToken(r.rows[0].id), username: username.toLowerCase() });
   })
@@ -169,9 +179,10 @@ app.post(
       String(username || '').toLowerCase(),
     ]);
     if (r.rows.length === 0 || !verifyPassword(String(password || ''), r.rows[0].pass_hash)) {
-      return res
-        .status(401)
-        .json({ error: 'アカウント名またはパスワードが違います' });
+      return res.status(401).json({
+        error: 'アカウント名またはパスワードが違います',
+        errorCode: 'INVALID_CREDENTIALS',
+      });
     }
     res.json({ token: await issueToken(r.rows[0].id), username: String(username).toLowerCase() });
   })
@@ -189,10 +200,15 @@ app.use(
     if (req.path === '/health' || req.path.startsWith('/auth/')) return next();
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-    if (!token) return res.status(401).json({ error: 'ログインが必要です' });
+    if (!token) {
+      return res.status(401).json({ error: 'ログインが必要です', errorCode: 'LOGIN_REQUIRED' });
+    }
     const r = await pool.query('SELECT user_id FROM sessions WHERE token = $1', [token]);
     if (r.rows.length === 0) {
-      return res.status(401).json({ error: 'セッションが無効です。再ログインしてください' });
+      return res.status(401).json({
+        error: 'セッションが無効です。再ログインしてください',
+        errorCode: 'SESSION_INVALID',
+      });
     }
     req.userId = r.rows[0].user_id;
     next();
@@ -207,7 +223,9 @@ app.get(
       'SELECT salt, key_check FROM sync_meta WHERE user_id = $1',
       [req.userId]
     );
-    if (r.rows.length === 0) return res.status(404).json({ error: 'not initialized' });
+    if (r.rows.length === 0) {
+      return res.status(404).json({ error: 'not initialized', errorCode: 'NOT_INITIALIZED' });
+    }
     res.json({ salt: r.rows[0].salt, keyCheck: r.rows[0].key_check });
   })
 );
@@ -217,7 +235,7 @@ app.put(
   ah(async (req, res) => {
     const { salt, keyCheck } = req.body || {};
     if (typeof salt !== 'string' || typeof keyCheck !== 'string') {
-      return res.status(400).json({ error: '入力内容が不正です' });
+      return res.status(400).json({ error: '入力内容が不正です', errorCode: 'INVALID_INPUT' });
     }
     // 既に初期化済みなら上書きしない(既存の salt を壊すと全データが復号不能になる)
     await pool.query(
@@ -385,7 +403,7 @@ app.put(
   ah(async (req, res) => {
     const { payload, iv, updatedAt } = req.body || {};
     if (typeof payload !== 'string' || typeof iv !== 'string' || typeof updatedAt !== 'number') {
-      return res.status(400).json({ error: '入力内容が不正です' });
+      return res.status(400).json({ error: '入力内容が不正です', errorCode: 'INVALID_INPUT' });
     }
     await pool.query(
       `INSERT INTO active_model (user_id, payload, iv, updated_ms)
@@ -438,7 +456,7 @@ if (fs.existsSync(webDist)) {
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
   console.error(err);
-  res.status(500).json({ error: 'サーバー内部エラー' });
+  res.status(500).json({ error: 'サーバー内部エラー', errorCode: 'INTERNAL_ERROR' });
 });
 
 // ---- 起動: テーブル初期化 → listen ----

@@ -115,5 +115,18 @@
   },
   "apiClient": {
     "serverError": "Server error (HTTP {{status}})"
+  },
+  "errors": {
+    "AUTH_RATE_LIMITED": "Too many attempts. Please wait about 15 minutes and try again.",
+    "RATE_LIMITED": "Too many requests. Please wait a moment and try again.",
+    "INVALID_USERNAME": "Account names must be 3–32 letters, digits, hyphens, or underscores.",
+    "INVALID_PASSWORD": "Passwords must be at least 8 characters.",
+    "USERNAME_TAKEN": "That account name is already taken.",
+    "INVALID_CREDENTIALS": "Incorrect account name or password.",
+    "LOGIN_REQUIRED": "You need to log in.",
+    "SESSION_INVALID": "Your session has expired. Please log in again.",
+    "NOT_INITIALIZED": "Not set up yet.",
+    "INVALID_INPUT": "That input isn't valid.",
+    "INTERNAL_ERROR": "Internal server error"
   }
 }

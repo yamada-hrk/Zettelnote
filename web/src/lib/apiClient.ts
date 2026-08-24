@@ -10,6 +10,19 @@ import i18n from './i18n';
 
 export class ApiError extends Error {}
 
+// サーバー(server/index.js)は後方互換のため日本語の`error`文言を
+// そのまま返し続けている(デスクトップ版Electronクライアントはこの
+// 文言をそのまま表示するため、多言語化の対象外)。Web版だけは
+// 追加の`errorCode`を見て、対応する翻訳があればそちらを優先する
+// (フェーズ4: tmp/多言語化(英語対応)の導入提案.md 参照)
+function translateServerError(detail: { error?: string; errorCode?: string } | null, status: number): string {
+  if (detail?.errorCode) {
+    const key = `errors.${detail.errorCode}`;
+    if (i18n.exists(key)) return i18n.t(key);
+  }
+  return detail?.error || i18n.t('apiClient.serverError', { status });
+}
+
 async function request<T>(
   method: string,
   path: string,
@@ -27,9 +40,7 @@ async function request<T>(
   if (res.status === 404) return null as T;
   if (!res.ok) {
     const detail = await res.json().catch(() => null);
-    throw new ApiError(
-      detail?.error || i18n.t('apiClient.serverError', { status: res.status }),
-    );
+    throw new ApiError(translateServerError(detail, res.status));
   }
   return res.json();
 }
