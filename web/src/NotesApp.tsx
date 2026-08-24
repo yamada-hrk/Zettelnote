@@ -11,6 +11,7 @@
 // キーワード)は electron/search.js を直接共有している。
 // ============================================================
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { useDebounce } from './hooks/useDebounce';
@@ -24,6 +25,7 @@ import MobileRecommendStrip from './MobileRecommendStrip';
 import PanelHandle from './components/PanelHandle';
 import ModelSettingsModal from './components/ModelSettingsModal';
 import LocalAdBanner from './components/LocalAdBanner';
+import LanguageSwitcher from './components/LanguageSwitcher';
 import type { Note } from './types';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved';
@@ -82,6 +84,8 @@ export default function NotesApp({
   /** ローカルモードから、ログイン/新規登録画面へ切り替える(localモードのみ) */
   onRequestLogin?: () => void;
 }) {
+  // フェーズ2時点では一部の文言のみ翻訳キー化している(大半はフェーズ3で対応)
+  const { t } = useTranslation();
   const [showModelSettings, setShowModelSettings] = useState(false);
 
   const leftPanel = useResizablePanel({
@@ -348,7 +352,7 @@ export default function NotesApp({
                 onClick={() => void handleCreate()}
                 className="w-full rounded-xl bg-gradient-to-b from-indigo-500 to-indigo-600 px-3 py-2 text-sm font-medium text-white shadow-lg shadow-indigo-950/50 ring-1 ring-white/10 transition-all duration-200 hover:from-indigo-400 hover:to-indigo-500 active:scale-[0.98]"
               >
-                ＋ 新規メモ
+                {t('common.newNote')}
               </button>
             </div>
 
@@ -356,7 +360,7 @@ export default function NotesApp({
               <input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="検索"
+                placeholder={t('common.search')}
                 className="w-full rounded-lg bg-white/5 px-3 py-1.5 text-sm text-slate-200 ring-1 ring-white/10 outline-none placeholder:text-slate-600 focus:ring-indigo-400/50"
               />
             </div>
@@ -444,8 +448,9 @@ export default function NotesApp({
                 onClick={() => setShowModelSettings(true)}
                 className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] text-slate-500 transition-colors hover:bg-white/10 hover:text-slate-300"
               >
-                🧠 意味的類似のモデル
+                🧠 {t('common.semanticModel')}
               </button>
+              <LanguageSwitcher />
               {mode === 'account' ? (
                 <>
                   <button
@@ -467,7 +472,7 @@ export default function NotesApp({
                   onClick={onRequestLogin}
                   className="w-full rounded-lg px-2 py-1.5 text-left text-[11px] font-medium text-indigo-300 transition-colors hover:bg-white/10"
                 >
-                  👤 ログイン / アカウント登録
+                  👤 {t('common.loginOrRegister')}
                 </button>
               )}
             </div>

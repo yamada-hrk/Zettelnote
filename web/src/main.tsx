@@ -5,6 +5,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
+import './lib/i18n';
 import './index.css';
 
 // Service Worker を登録する(registerType: 'autoUpdate' のため、
