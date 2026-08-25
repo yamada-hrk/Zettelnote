@@ -110,9 +110,6 @@
     "expand": "サイドバーを開く",
     "collapse": "サイドバーを折りたたむ"
   },
-  "localAd": {
-    "placeholder": "広告枠(ローカルモード限定・準備中)"
-  },
   "apiClient": {
     "serverError": "サーバーエラー (HTTP {{status}})"
   },

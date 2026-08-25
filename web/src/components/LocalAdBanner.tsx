@@ -7,18 +7,17 @@
 // 薄い帯として付加するだけに留める(アンカー広告的な配置)。
 //
 // AdSense審査が承認され、実際の広告ユニット(data-ad-slot)を作成する
-// までは、このコンポーネントは枠だけを表示する(実際の広告は表示しない。
-// 承認前に adsbygoogle.js を読み込んでも配信されないため)
+// までは、このコンポーネントは何も描画しない(「準備中」枠を出すと、
+// AdSense審査で「作成中である」screenとして扱われるリスクがあるため。
+// 2026-08、実際にこれが再審査却下の一因と判明した)
 // ============================================================
 import { useEffect, useRef } from 'react';
-import { useTranslation } from 'react-i18next';
 
 /** AdSense管理画面で広告ユニットを作成した後、そのdata-ad-slot値に差し替える */
 const AD_SLOT_ID = '';
 const AD_CLIENT_ID = 'ca-pub-5401885500746261';
 
 export default function LocalAdBanner() {
-  const { t } = useTranslation();
   const insRef = useRef<HTMLModElement>(null);
   const pushed = useRef(false);
 
@@ -34,14 +33,7 @@ export default function LocalAdBanner() {
     }
   }, []);
 
-  if (!AD_SLOT_ID) {
-    // 広告ユニット未作成の間は、レイアウト確認用の枠だけ表示する
-    return (
-      <div className="flex h-[90px] shrink-0 items-center justify-center border-t border-white/5 bg-white/[0.02] text-[11px] text-slate-600">
-        {t('localAd.placeholder')}
-      </div>
-    );
-  }
+  if (!AD_SLOT_ID) return null;
 
   return (
     <div className="flex shrink-0 justify-center border-t border-white/5 bg-white/[0.02] py-1">

@@ -110,9 +110,6 @@
     "expand": "Expand sidebar",
     "collapse": "Collapse sidebar"
   },
-  "localAd": {
-    "placeholder": "Ad space (local mode only, coming soon)"
-  },
   "apiClient": {
     "serverError": "Server error (HTTP {{status}})"
   },
