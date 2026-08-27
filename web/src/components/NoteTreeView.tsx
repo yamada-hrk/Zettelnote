@@ -1,8 +1,23 @@
 // ============================================================
-// 関連メモツリー表示(フェーズ7: データの鮮度)
+// 関連メモツリー表示(フェーズ8: 拡大縮小・パン操作)
 //
 // tmp/関連メモツリー表示の導入提案.md 参照。編集中のメモを中心に、
 // 意味的類似度の高いメモを放射状に配置して表示する全画面オーバーレイ。
+// これでフェーズ1〜8がすべて実装済み
+//
+// フェーズ8のスコープ(3.9): Google Mapsのような操作感を目指す
+// - ホイール/ピンチした位置を中心に拡大縮小する(その位置のコンテンツ
+//   座標を逆算し、拡大後も同じ位置に留まるようpanを再計算する)
+// - Pointer Events APIでマウス・タッチを統一的に扱う(ライブラリ不使用)。
+//   1本指/マウスドラッグでパン、2本指ピンチでズーム
+// - ズーム範囲はMIN_SCALE〜MAX_SCALEに制限
+// - リセットボタン: PanelHandleの「ダブルクリックで既定幅にリセット」と
+//   同じパターンに揃え、既定表示(拡大率100%・パン無し)へ戻す
+//   シンプルな実装にしている(全ノードのバウンディングボックスを計算して
+//   画面に収める、より高度な「フィット」は行っていない)
+// - 慣性スクロールはスコープ外(3.9で将来検討と明記済み)
+// - 実装はホイールのnativeイベントリスナー(passive:falseでpreventDefault
+//   するため)以外はJSXのPointer Eventsハンドラのみで完結している
 //
 // フェーズ7のスコープ(3.1・3.8):
 // - ツリーはスナップショット。表示中は他端末からの同期更新
@@ -82,6 +97,15 @@ const GHOST_ANGLE_THRESHOLD = Math.PI * 0.6;
 const GHOST_OFFSET_RADIUS = 80;
 /** ゴーストノードをアンカー自身の角度から少しずらす量(ラジアン。アンカー自身の子ノードと重なりにくくするため) */
 const GHOST_OFFSET_ANGLE = Math.PI * 0.22;
+/** ズーム倍率の下限・上限(3.9) */
+const MIN_SCALE = 0.3;
+const MAX_SCALE = 2.5;
+/** マウスホイール1刻みあたりの倍率変化 */
+const WHEEL_ZOOM_FACTOR = 1.12;
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
+}
 
 interface TreeNode {
   uid: string;
@@ -268,6 +292,115 @@ export default function NoteTreeView({
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  // 拡大縮小・パン操作(3.9)。Google Mapsのような操作感を目指し、
+  // ホイール/ピンチした位置を中心に拡大縮小する。ライブラリは使わず
+  // Pointer Events APIでマウス・タッチを統一的に扱う
+  const [scale, setScale] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  // ホイールのnativeイベントリスナー(passive:falseでpreventDefaultするため
+  // useEffectで手動addEventListenerする必要がある)は空の依存配列で1度だけ
+  // 登録するため、常に最新のscale/panをrefで参照する
+  const scaleRef = useRef(scale);
+  const panRef = useRef(pan);
+  useEffect(() => {
+    scaleRef.current = scale;
+  }, [scale]);
+  useEffect(() => {
+    panRef.current = pan;
+  }, [pan]);
+
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return;
+    const onWheelNative = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = el.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const prevScale = scaleRef.current;
+      const prevPan = panRef.current;
+      const factor = e.deltaY < 0 ? WHEEL_ZOOM_FACTOR : 1 / WHEEL_ZOOM_FACTOR;
+      const newScale = clamp(prevScale * factor, MIN_SCALE, MAX_SCALE);
+      // ホイール位置(=カーソル位置)が拡大縮小後も同じ場所を指すよう、
+      // その位置の「コンテンツ座標」を求めてから逆算する
+      const contentX = (mouseX - prevPan.x) / prevScale;
+      const contentY = (mouseY - prevPan.y) / prevScale;
+      setScale(newScale);
+      setPan({ x: mouseX - contentX * newScale, y: mouseY - contentY * newScale });
+    };
+    el.addEventListener('wheel', onWheelNative, { passive: false });
+    return () => el.removeEventListener('wheel', onWheelNative);
+  }, []);
+
+  // ドラッグ(パン)・ピンチ(ズーム)の進行中の状態。頻繁に更新される
+  // ブックキーピング用の値なのでrefで保持し、再レンダーは起こさない
+  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const dragRef = useRef<
+    | { mode: 'pan'; startPan: { x: number; y: number }; startPointer: { x: number; y: number } }
+    | {
+        mode: 'pinch';
+        startScale: number;
+        startDist: number;
+        startPan: { x: number; y: number };
+        focus: { x: number; y: number };
+      }
+    | null
+  >(null);
+
+  const handleAreaPointerDown = (e: React.PointerEvent) => {
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 1) {
+      dragRef.current = { mode: 'pan', startPan: pan, startPointer: { x: e.clientX, y: e.clientY } };
+    } else if (pointersRef.current.size === 2) {
+      const pts = [...pointersRef.current.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+      const rect = areaRef.current?.getBoundingClientRect();
+      const focus = rect
+        ? { x: (pts[0].x + pts[1].x) / 2 - rect.left, y: (pts[0].y + pts[1].y) / 2 - rect.top }
+        : { x: 0, y: 0 };
+      dragRef.current = { mode: 'pinch', startScale: scale, startDist: dist, startPan: pan, focus };
+    }
+  };
+
+  const handleAreaPointerMove = (e: React.PointerEvent) => {
+    if (!pointersRef.current.has(e.pointerId)) return;
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const drag = dragRef.current;
+    if (!drag) return;
+    if (drag.mode === 'pan' && pointersRef.current.size === 1) {
+      const dx = e.clientX - drag.startPointer.x;
+      const dy = e.clientY - drag.startPointer.y;
+      setPan({ x: drag.startPan.x + dx, y: drag.startPan.y + dy });
+    } else if (drag.mode === 'pinch' && pointersRef.current.size === 2) {
+      const pts = [...pointersRef.current.values()];
+      const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+      const newScale = clamp(drag.startScale * (dist / drag.startDist), MIN_SCALE, MAX_SCALE);
+      const contentX = (drag.focus.x - drag.startPan.x) / drag.startScale;
+      const contentY = (drag.focus.y - drag.startPan.y) / drag.startScale;
+      setScale(newScale);
+      setPan({ x: drag.focus.x - contentX * newScale, y: drag.focus.y - contentY * newScale });
+    }
+  };
+
+  const handleAreaPointerUp = (e: React.PointerEvent) => {
+    pointersRef.current.delete(e.pointerId);
+    if (pointersRef.current.size === 0) {
+      dragRef.current = null;
+    } else if (pointersRef.current.size === 1) {
+      const [pt] = [...pointersRef.current.values()];
+      dragRef.current = { mode: 'pan', startPan: pan, startPointer: pt };
+    }
+  };
+
+  // 全体を画面に収めるリセットボタン(3.9)。PanelHandleの「ダブルクリックで
+  // 既定幅にリセット」と同じ「元に戻す」パターンに揃え、既定表示
+  // (拡大率100%・パン無し)へ戻すシンプルな実装にしている
+  const handleResetView = () => {
+    setScale(1);
+    setPan({ x: 0, y: 0 });
+  };
 
   useEffect(() => {
     // 中心(または再センタリング先)のメモが他端末で削除されていた場合(3.8)。
@@ -529,6 +662,13 @@ export default function NoteTreeView({
         </h2>
         <div className="flex items-center gap-2">
           <button
+            onClick={handleResetView}
+            title={t('noteTree.resetView')}
+            className="rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+          >
+            ⤢ {t('noteTree.resetView')}
+          </button>
+          <button
             onClick={() => setRefreshKey((k) => k + 1)}
             disabled={modelSwitching || expanding}
             title={modelSwitching ? t('noteTree.modelSwitchingBlocked') : undefined}
@@ -545,13 +685,29 @@ export default function NoteTreeView({
         </div>
       </div>
 
-      <div ref={areaRef} className="relative flex-1 overflow-hidden">
+      <div
+        ref={areaRef}
+        onPointerDown={handleAreaPointerDown}
+        onPointerMove={handleAreaPointerMove}
+        onPointerUp={handleAreaPointerUp}
+        onPointerCancel={handleAreaPointerUp}
+        className="relative flex-1 touch-none select-none overflow-hidden active:cursor-grabbing"
+      >
         {nodes.length === 0 && expanding && (
           <p className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs text-slate-500">
             {t('noteTree.loading')}
           </p>
         )}
 
+        {/* 拡大縮小・パン操作(3.9)の対象レイヤー。ノード配置計算(absPosByUid等)は
+            そのままに、この階層でtransformをかけるだけでズーム/パンを実現する */}
+        <div
+          className="absolute inset-0"
+          style={{
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
+            transformOrigin: '0 0',
+          }}
+        >
         {areaSize.w > 0 && (
           <>
             {/* 横断リンク(3.5): メインの線より下のレイヤーに、細く・薄く曲線で描画する。
@@ -646,6 +802,7 @@ export default function NoteTreeView({
             </div>
           </TreeNodeButton>
         ))}
+        </div>
       </div>
     </div>
   );

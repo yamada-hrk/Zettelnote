@@ -39,6 +39,7 @@
     "loading": "Searching for related notes…",
     "expanding": "Expanding…",
     "refresh": "Refresh",
+    "resetView": "Reset view",
     "modelSwitchingBlocked": "Unavailable while switching models",
     "noteDeleted": "This note couldn't be found (it may have been deleted on another device)"
   },
