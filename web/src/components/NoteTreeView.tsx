@@ -1,8 +1,21 @@
 // ============================================================
-// 関連メモツリー表示(フェーズ5: ゴーストノード)
+// 関連メモツリー表示(フェーズ6: 操作性)
 //
 // tmp/関連メモツリー表示の導入提案.md 参照。編集中のメモを中心に、
 // 意味的類似度の高いメモを放射状に配置して表示する全画面オーバーレイ。
+//
+// フェーズ6のスコープ(3.7):
+// - 子ノード(ゴースト含む)クリック: 再センタリング。onOpen()が
+//   NotesApp側のselectedUidを更新し、それがcenterUidプロップとして
+//   このコンポーネントへ伝播するため、既存の階層展開useEffect
+//   (centerUidが依存配列に入っている)が自動的に新しい中心から
+//   再展開する。ツリー表示は閉じない
+// - 中心ノードクリック: 既にそのメモが選択されている状態なので、
+//   ツリー表示を閉じるだけで良い(onOpen()は呼ばない)
+// - 閲覧履歴との統合: onOpen()はNotesApp内部でuseNoteHistoryへの
+//   記録も行うため、再センタリングで辿った経路をAlt+←/→でそのまま
+//   遡れる。逆にAlt+←/→でcenterUidが変化した場合も、同じ仕組みで
+//   ツリー表示が自動的に追従する(この副作用は狙って設計したもの)
 //
 // フェーズ5のスコープ(3.6): 角度補正(フェーズ4)でも緩和しきれない、
 // 角度差が大きい(≒対角線上など著しく離れた)ノード間の横断リンクは、
@@ -24,7 +37,7 @@
 //   d属性はcalc()を解釈できないため、コンテナの実ピクセルサイズを
 //   ResizeObserverで測定し、絶対座標で描画している
 //
-// ノードクリックの再センタリング(フェーズ6)・拡大縮小(フェーズ8)は未実装
+// 拡大縮小(フェーズ8)は未実装
 //
 // 接続ルールの閾値について: 自前の閾値ロジックは実装していない。
 // mpnetの vectorSearch (electron/embeddingCatalog.js) が既に
@@ -394,9 +407,21 @@ export default function NoteTreeView({
 
   if (!center) return null;
 
-  const handleNodeClick = (uid: string) => {
-    onOpen(uid);
+  // 中心のメモをクリック: 既にこのメモが選択されている状態なので、
+  // ツリー表示を閉じてEditorへ戻るだけで良い(3.7)
+  const handleCenterClick = () => {
     onClose();
+  };
+
+  // 子ノード(ゴースト含む)をクリック: 再センタリング(3.7)。onOpen()は
+  // NotesApp側のselectedUidを更新し、それがcenterUidプロップとして
+  // このコンポーネントへ伝播するため、既存の階層展開useEffectが
+  // (centerUidの変化を検知して)自動的に新しい中心から再展開する。
+  // onClose()は呼ばない(ツリー表示は開いたまま)。onOpen()は内部で
+  // 閲覧履歴(useNoteHistory)にも記録するため、ツリー内で辿った経路を
+  // 既存のAlt+←/→でそのまま遡れる
+  const handleChildClick = (uid: string) => {
+    onOpen(uid);
   };
 
   // uid → 中心からの相対座標(px)
@@ -506,7 +531,7 @@ export default function NoteTreeView({
 
         {/* 中心ノード */}
         <button
-          onClick={() => handleNodeClick(center.uid)}
+          onClick={handleCenterClick}
           className="absolute left-1/2 top-1/2 w-56 -translate-x-1/2 -translate-y-1/2 rounded-2xl ring-1 ring-indigo-400/30 bg-[#12151f]/95 px-4 py-3 text-left shadow-2xl shadow-indigo-950/50 backdrop-blur-xl transition-transform duration-200 hover:scale-[1.03]"
         >
           <div className="truncate text-sm font-semibold text-indigo-300">
@@ -526,7 +551,7 @@ export default function NoteTreeView({
               y={pos.y}
               width={11 * 16 * scale}
               opacity={node.depth === 1 ? 1 : node.depth === 2 ? 0.9 : 0.75}
-              onClick={() => handleNodeClick(node.uid)}
+              onClick={() => handleChildClick(node.uid)}
             >
               <div className="truncate text-xs font-medium text-slate-200">
                 {node.title || t('common.untitled')}
@@ -549,7 +574,7 @@ export default function NoteTreeView({
             width={11 * 16 * 0.8}
             opacity={0.7}
             ghost
-            onClick={() => handleNodeClick(g.uid)}
+            onClick={() => handleChildClick(g.uid)}
           >
             <div className="truncate text-[11px] text-slate-400">
               ⇢ {g.title || t('common.untitled')}
