@@ -47,6 +47,7 @@ const fs = require('fs');
 const crypto = require('crypto');
 const express = require('express');
 const cors = require('cors');
+const morgan = require('morgan');
 const { rateLimit } = require('express-rate-limit');
 const { Pool } = require('pg');
 
@@ -60,6 +61,12 @@ const app = express();
 // 同一の送信元として扱われて他ユーザーとレート制限枠を共有してしまう
 app.set('trust proxy', 1);
 app.use(cors());
+// アクセスログを標準出力へ(combined形式)。ログの永続化・ローテーションは
+// アプリ側では行わず、ホスト側のログ収集サイドカー(docker.sock経由で
+// 各コンテナのログを吸い出す)に任せる設計にしている。api/api2の2台構成
+// でもアプリ側は今まで通りstdoutに吐くだけで良く、ファイル書き込み・
+// ローテーションの調整をコンテナ間で行う必要が無い
+app.use(morgan('combined'));
 app.use(express.json({ limit: '20mb' }));
 
 /** 非同期ハンドラのエラーを error handler へ流すラッパー(next も転送する) */
