@@ -1,9 +1,29 @@
 // ============================================================
-// 関連メモツリー表示(フェーズ8: 拡大縮小・パン操作)
+// 関連メモツリー表示(フェーズ1〜8実装済み + 横断リンクの段階的計算)
 //
 // tmp/関連メモツリー表示の導入提案.md 参照。編集中のメモを中心に、
 // 意味的類似度の高いメモを放射状に配置して表示する全画面オーバーレイ。
-// これでフェーズ1〜8がすべて実装済み
+//
+// 【体感速度改善】横断リンク(3.5)は当初、階層展開が完全に終わって
+// から一括計算していたが、これを「新しいノードが1件追加されるたびに、
+// その時点で既に表示中の全ノードとの横断リンクをその場でバックグラウンド
+// (fire-and-forget)でチェックする」方式に変更した。階層展開と横断
+// リンク計算を同時並行で進められるため、ノードと横断リンクが同時に
+// 少しずつ増えていく見た目になる(3.5参照)。
+// - 網羅性: 「新しいノードNが追加されたら、既に表示中の全ノードとNの
+//   ペアだけをチェックする」ルールにより、どのペアも「後から追加された
+//   方」のタイミングで必ず1回チェックされ、重複計算・漏れ無く全ペアを
+//   網羅できる
+// - 中心ノードだけは例外: 中心は最初から表示されているため、他ノードの
+//   ように「後から追加された側のチェック」で自然にはカバーされない。
+//   階層展開が完了した後にまとめて1回だけチェックする
+// - 角度補正(3.6)はnodes/crossLinksの変化に反応するuseMemoのため、
+//   横断リンクが見つかるたびに再計算される。ただし毎回ノードの
+//   「元の基本角度」から計算し直す実装のため、再計算を繰り返しても
+//   累積誤差でズレていく心配は無い
+// - Workerが1つしかないため計算総量・実測時間はほぼ変わらない
+//   (体感速度改善が主目的。真の高速化にはWorker複数化が必要、
+//   ただしメモリコストが高いため現時点では未採用。3.5・5章参照)
 //
 // フェーズ8のスコープ(3.9): Google Mapsのような操作感を目指す
 // - ホイール/ピンチした位置を中心に拡大縮小する(その位置のコンテンツ
@@ -423,6 +443,46 @@ export default function NoteTreeView({
     (async () => {
       const seen = new Set<string>([center.uid]);
       const allNodes: TreeNode[] = [];
+      // 横断リンク(3.5)を階層展開と同時並行で計算するための状態。
+      // 「新しいノードが追加されるたびに、既に表示中の全ノードとの
+      // 横断リンクをその場でチェックする」方式にすることで、どのペアも
+      // 「後から追加された方」のタイミングで必ず1回チェックされ、
+      // 重複計算・漏れ無く全ペアを網羅できる(提案書3.5参照)
+      const linkMap = new Map<string, CrossLink>();
+      const visibleSoFar: { uid: string; title: string; body: string }[] = [
+        { uid: center.uid, title: center.title, body: center.body },
+      ];
+
+      // 指定ノードと、既に表示中の全ノード(excludeUidsは除く)との
+      // 横断リンクをバックグラウンドでチェックする。階層展開の続行を
+      // 妨げないようawaitしない(fire-and-forget)。解決した時点で
+      // linkMapを更新し、変化があればsetCrossLinksへ反映する
+      const checkCrossLinksInBackground = (
+        query: { uid: string; title: string; body: string },
+        excludeUids: Set<string>,
+      ) => {
+        const candidates = visibleSoFar.filter(
+          (v) => v.uid !== query.uid && !excludeUids.has(v.uid),
+        );
+        if (candidates.length === 0) return;
+        const docs = candidates.map((v) => ({ id: v.uid, title: v.title, body: v.body }));
+        vectorSearch(`${query.title}\n${query.body}`, docs, docs.length, modelId).then(
+          (results) => {
+            if (cancelled) return;
+            let changed = false;
+            for (const r of results) {
+              const key = pairKey(query.uid, r.uid);
+              const existing = linkMap.get(key);
+              if (!existing || existing.score < r.score) {
+                linkMap.set(key, { a: query.uid, b: r.uid, score: r.score });
+                changed = true;
+              }
+            }
+            if (changed) setCrossLinks([...linkMap.values()]);
+          },
+        );
+      };
+
       // 階層1は中心ノードのみを親に持つ。角度はnullを渡して全周配置にする
       let currentLevel: { uid: string; title: string; body: string; angle: number | null }[] = [
         { uid: center.uid, title: center.title, body: center.body, angle: null },
@@ -457,6 +517,7 @@ export default function NoteTreeView({
             if (allNodes.length >= NODE_CAP) return;
             seen.add(item.uid);
             const angle = childAngle(parent.angle, i, siblingCount);
+            const body = notes.find((n) => n.uid === item.uid)?.body ?? '';
             const node: TreeNode = {
               uid: item.uid,
               title: item.title,
@@ -466,12 +527,15 @@ export default function NoteTreeView({
               parentUid: parent.uid,
             };
             allNodes.push(node);
-            nextLevel.push({
-              uid: item.uid,
-              title: item.title,
-              body: notes.find((n) => n.uid === item.uid)?.body ?? '',
-              angle,
-            });
+            nextLevel.push({ uid: item.uid, title: item.title, body, angle });
+            // 親(バックボーンの相手)は除外して、既に表示中の全ノードと
+            // 横断リンクをチェックしてから、自分自身をvisibleSoFarへ
+            // 追加する(同じバッチ内の兄弟ノードにも正しく反映されるように)
+            checkCrossLinksInBackground(
+              { uid: item.uid, title: item.title, body },
+              new Set([parent.uid]),
+            );
+            visibleSoFar.push({ uid: item.uid, title: item.title, body });
           });
           // 親ノード1件処理するたびに反映(段階的展開)
           setNodes([...allNodes]);
@@ -481,6 +545,19 @@ export default function NoteTreeView({
         if (currentLevel.length === 0) break; // これ以上広がる先が無い
       }
 
+      // 中心ノード自身の横断リンクは、他のノードのように「後から追加された
+      // 側のチェック」で自然にはカバーされない(中心は最初から表示されて
+      // いるため)。展開完了後にまとめて1回だけチェックする
+      if (!cancelled) {
+        const directChildrenOfCenter = new Set(
+          allNodes.filter((n) => n.parentUid === center.uid).map((n) => n.uid),
+        );
+        checkCrossLinksInBackground(
+          { uid: center.uid, title: center.title, body: center.body },
+          directChildrenOfCenter,
+        );
+      }
+
       if (!cancelled) setExpanding(false);
     })();
 
@@ -488,57 +565,6 @@ export default function NoteTreeView({
       cancelled = true;
     };
   }, [center, notes, modelId, refreshKey]);
-
-  // 横断リンク(3.5): 階層展開が完了した後、表示済み全ノード間の
-  // ペア比較を行う。既存のvectorSearchを「そのノードをクエリ、他の
-  // 表示済みノードをdocs」として呼び出す形で流用しているため、
-  // 新しい埋め込み計算ロジックは追加していない
-  useEffect(() => {
-    if (expanding || !center) return;
-    if (nodes.length === 0) return;
-    let cancelled = false;
-
-    (async () => {
-      const visible = [
-        { uid: center.uid, title: center.title, body: center.body },
-        ...nodes.map((n) => {
-          const note = notes.find((x) => x.uid === n.uid);
-          return { uid: n.uid, title: n.title, body: note?.body ?? '' };
-        }),
-      ];
-      // バックボーン(親子関係)は既にメインの線で描画済みなので横断リンクから除外する
-      const backbone = new Set(nodes.map((n) => pairKey(n.uid, n.parentUid)));
-
-      const perNodeResults = await Promise.all(
-        visible.map(async (n) => {
-          const others = visible.filter((o) => o.uid !== n.uid);
-          if (others.length === 0) return [];
-          const docs = others.map((o) => ({ id: o.uid, title: o.title, body: o.body }));
-          const results = await vectorSearch(`${n.title}\n${n.body}`, docs, others.length, modelId);
-          return results.map((r) => ({ a: n.uid, b: r.uid, score: r.score }));
-        }),
-      );
-      if (cancelled) return;
-
-      const linkMap = new Map<string, CrossLink>();
-      for (const results of perNodeResults) {
-        for (const link of results) {
-          const key = pairKey(link.a, link.b);
-          if (backbone.has(key)) continue;
-          const existing = linkMap.get(key);
-          if (!existing || existing.score < link.score) {
-            linkMap.set(key, { a: link.a, b: link.b, score: link.score });
-          }
-        }
-      }
-      setCrossLinks([...linkMap.values()]);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expanding, center, modelId]);
 
   // Escape キーでも閉じられるようにする
   useEffect(() => {
