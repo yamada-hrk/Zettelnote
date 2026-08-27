@@ -717,7 +717,7 @@ export default function NoteTreeView({
             {/* 横断リンク(3.5): メインの線より下のレイヤーに、細く・薄く曲線で描画する。
                 ゴーストノード(フェーズ5)がある場合は、実ノードではなく
                 ゴーストの位置へ短い線を引く */}
-            <svg className="pointer-events-none absolute inset-0 h-full w-full">
+            <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
               {crossLinks.map((link) => {
                 const posA = absPosByUid.get(link.a);
                 const posB =
@@ -736,7 +736,7 @@ export default function NoteTreeView({
             </svg>
 
             {/* つながりの線(各ノード → 親ノード。横断リンクより上のレイヤーで、太く・はっきり曲線で描画する) */}
-            <svg className="pointer-events-none absolute inset-0 h-full w-full">
+            <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
               {nodes.map((node) => {
                 const pos = absPosByUid.get(node.uid)!;
                 const parentPos = absPosByUid.get(node.parentUid) ?? { x: cx, y: cy };
