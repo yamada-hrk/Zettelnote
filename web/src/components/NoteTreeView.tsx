@@ -349,6 +349,10 @@ export default function NoteTreeView({
   >(null);
 
   const handleAreaPointerDown = (e: React.PointerEvent) => {
+    // ノードボタン上でのポインターダウンではパン/ピンチを開始しない。
+    // setPointerCaptureはclickイベントの対象も巻き取ってしまうため、
+    // ここで捕捉するとボタンのonClickが発火しなくなってしまう
+    if ((e.target as HTMLElement).closest('button')) return;
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointersRef.current.size === 1) {
