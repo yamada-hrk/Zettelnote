@@ -36,7 +36,8 @@
   "noteTree": {
     "title": "🌳 Related notes tree",
     "close": "Close",
-    "loading": "Searching for related notes…"
+    "loading": "Searching for related notes…",
+    "expanding": "Expanding…"
   },
   "recommend": {
     "computing": "Computing…",

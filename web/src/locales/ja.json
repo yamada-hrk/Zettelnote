@@ -36,7 +36,8 @@
   "noteTree": {
     "title": "🌳 関連メモツリー",
     "close": "閉じる",
-    "loading": "関連メモを検索中…"
+    "loading": "関連メモを検索中…",
+    "expanding": "展開中…"
   },
   "recommend": {
     "computing": "計算中…",
