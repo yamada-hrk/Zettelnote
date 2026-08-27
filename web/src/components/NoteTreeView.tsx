@@ -1,18 +1,20 @@
 // ============================================================
-// 関連メモツリー表示(フェーズ2: 多階層展開)
+// 関連メモツリー表示(フェーズ3: 横断リンク)
 //
 // tmp/関連メモツリー表示の導入提案.md 参照。編集中のメモを中心に、
 // 意味的類似度の高いメモを放射状に配置して表示する全画面オーバーレイ。
 //
-// フェーズ2のスコープ: 階層1〜3への多階層展開、階層ごとのN逓減、
-// 重複排除。横断リンク(フェーズ3)・角度補正やノード位置固定
-// (フェーズ4)・ゴーストノード(フェーズ5)・ノードクリックの
+// フェーズ3のスコープ: 階層展開が完了した後、表示済み全ノード間の
+// ペア比較を行い、親子関係(発見経路)には無いが強い類似度を持つ
+// ペアを「横断リンク」として追加描画する(3.5)。角度補正やノード
+// 位置固定(フェーズ4)・ゴーストノード(フェーズ5)・ノードクリックの
 // 再センタリング(フェーズ6)・拡大縮小(フェーズ8)は未実装
 //
 // 接続ルールの閾値について: 自前の閾値ロジックは実装していない。
 // mpnetの vectorSearch (electron/embeddingCatalog.js) が既に
 // z-scoreベースの相対閾値フィルタを持っており、そのままの結果を
-// 「閾値通過後の候補」として扱う(フェーズ1で確認済み、3.4参照)
+// 「閾値通過後の候補」として扱う(フェーズ1で確認済み、3.4参照)。
+// 横断リンクの算出もこの同じ閾値をそのまま利用している
 // ============================================================
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,6 +39,17 @@ interface TreeNode {
   depth: number;
   angle: number;
   parentUid: string;
+}
+
+interface CrossLink {
+  a: string;
+  b: string;
+  score: number;
+}
+
+/** 親子関係(発見経路)のペアを正規化したキーで管理する(横断リンクと重複させないため) */
+function pairKey(a: string, b: string): string {
+  return a < b ? `${a}|${b}` : `${b}|${a}`;
 }
 
 interface Props {
@@ -76,6 +89,7 @@ export default function NoteTreeView({
   const { t } = useTranslation();
   const [expanding, setExpanding] = useState(true);
   const [nodes, setNodes] = useState<TreeNode[]>([]);
+  const [crossLinks, setCrossLinks] = useState<CrossLink[]>([]);
   const center = notes.find((n) => n.uid === centerUid) ?? null;
 
   useEffect(() => {
@@ -83,6 +97,7 @@ export default function NoteTreeView({
     let cancelled = false;
     setExpanding(true);
     setNodes([]);
+    setCrossLinks([]);
 
     (async () => {
       const seen = new Set<string>([center.uid]);
@@ -153,6 +168,57 @@ export default function NoteTreeView({
     };
   }, [center, notes, modelId]);
 
+  // 横断リンク(3.5): 階層展開が完了した後、表示済み全ノード間の
+  // ペア比較を行う。既存のvectorSearchを「そのノードをクエリ、他の
+  // 表示済みノードをdocs」として呼び出す形で流用しているため、
+  // 新しい埋め込み計算ロジックは追加していない
+  useEffect(() => {
+    if (expanding || !center) return;
+    if (nodes.length === 0) return;
+    let cancelled = false;
+
+    (async () => {
+      const visible = [
+        { uid: center.uid, title: center.title, body: center.body },
+        ...nodes.map((n) => {
+          const note = notes.find((x) => x.uid === n.uid);
+          return { uid: n.uid, title: n.title, body: note?.body ?? '' };
+        }),
+      ];
+      // バックボーン(親子関係)は既にメインの線で描画済みなので横断リンクから除外する
+      const backbone = new Set(nodes.map((n) => pairKey(n.uid, n.parentUid)));
+
+      const perNodeResults = await Promise.all(
+        visible.map(async (n) => {
+          const others = visible.filter((o) => o.uid !== n.uid);
+          if (others.length === 0) return [];
+          const docs = others.map((o) => ({ id: o.uid, title: o.title, body: o.body }));
+          const results = await vectorSearch(`${n.title}\n${n.body}`, docs, others.length, modelId);
+          return results.map((r) => ({ a: n.uid, b: r.uid, score: r.score }));
+        }),
+      );
+      if (cancelled) return;
+
+      const linkMap = new Map<string, CrossLink>();
+      for (const results of perNodeResults) {
+        for (const link of results) {
+          const key = pairKey(link.a, link.b);
+          if (backbone.has(key)) continue;
+          const existing = linkMap.get(key);
+          if (!existing || existing.score < link.score) {
+            linkMap.set(key, { a: link.a, b: link.b, score: link.score });
+          }
+        }
+      }
+      setCrossLinks([...linkMap.values()]);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expanding, center, modelId]);
+
   // Escape キーでも閉じられるようにする
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -203,7 +269,27 @@ export default function NoteTreeView({
           </p>
         )}
 
-        {/* つながりの線(各ノード → 親ノード) */}
+        {/* 横断リンク(3.5): メインの線より下のレイヤーに、細く・薄く描画する */}
+        <svg className="pointer-events-none absolute inset-0 h-full w-full">
+          {crossLinks.map((link) => {
+            const posA = positionByUid.get(link.a);
+            const posB = positionByUid.get(link.b);
+            if (!posA || !posB) return null;
+            return (
+              <line
+                key={`${link.a}|${link.b}`}
+                x1={`calc(50% + ${posA.x}px)`}
+                y1={`calc(50% + ${posA.y}px)`}
+                x2={`calc(50% + ${posB.x}px)`}
+                y2={`calc(50% + ${posB.y}px)`}
+                stroke="rgba(196, 181, 253, 0.18)"
+                strokeWidth={1}
+              />
+            );
+          })}
+        </svg>
+
+        {/* つながりの線(各ノード → 親ノード。横断リンクより上のレイヤーで、太く・はっきり描画する) */}
         <svg className="pointer-events-none absolute inset-0 h-full w-full">
           {nodes.map((node) => {
             const pos = positionByUid.get(node.uid)!;
