@@ -30,7 +30,13 @@
     "titlePlaceholder": "Enter a title…",
     "bodyPlaceholder": "Write your note in Markdown…",
     "noSelection": "No note selected",
-    "deleteConfirm": "Delete this note?"
+    "deleteConfirm": "Delete this note?",
+    "treeView": "🌳 Tree view"
+  },
+  "noteTree": {
+    "title": "🌳 Related notes tree",
+    "close": "Close",
+    "loading": "Searching for related notes…"
   },
   "recommend": {
     "computing": "Computing…",

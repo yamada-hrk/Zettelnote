@@ -30,7 +30,13 @@
     "titlePlaceholder": "タイトルを入力…",
     "bodyPlaceholder": "ここに Markdown でメモを書く…",
     "noSelection": "メモが選択されていません",
-    "deleteConfirm": "このメモを削除しますか?"
+    "deleteConfirm": "このメモを削除しますか?",
+    "treeView": "🌳 ツリー表示"
+  },
+  "noteTree": {
+    "title": "🌳 関連メモツリー",
+    "close": "閉じる",
+    "loading": "関連メモを検索中…"
   },
   "recommend": {
     "computing": "計算中…",

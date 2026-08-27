@@ -26,6 +26,7 @@ import PanelHandle from './components/PanelHandle';
 import ModelSettingsModal from './components/ModelSettingsModal';
 import LocalAdBanner from './components/LocalAdBanner';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import NoteTreeView from './components/NoteTreeView';
 import type { Note } from './types';
 
 type SaveState = 'idle' | 'dirty' | 'saving' | 'saved';
@@ -126,6 +127,7 @@ export default function NotesApp({
   const [preview, setPreview] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const debouncedQuery = useDebounce(searchQuery, 150);
+  const [treeViewOpen, setTreeViewOpen] = useState(false);
 
   // Markdown → HTML(XSS 対策として DOMPurify でサニタイズ。デスクトップ版 Editor.tsx と同一ロジック)
   const previewHtml = useMemo(() => {
@@ -571,6 +573,12 @@ export default function NotesApp({
                 </span>
                 <div className="flex-1" />
                 <button
+                  onClick={() => setTreeViewOpen(true)}
+                  className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+                >
+                  {t('editor.treeView')}
+                </button>
+                <button
                   onClick={() => void handleDelete()}
                   className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-red-500/10 hover:text-red-400"
                 >
@@ -684,6 +692,16 @@ export default function NotesApp({
             void switchModel(modelId);
           }}
           onClose={() => setShowModelSettings(false)}
+        />
+      )}
+
+      {treeViewOpen && selected && (
+        <NoteTreeView
+          notes={notes}
+          centerUid={selected.uid}
+          modelId={activeModelId}
+          onOpen={(uid) => selectNote(uid, true)}
+          onClose={() => setTreeViewOpen(false)}
         />
       )}
     </div>
