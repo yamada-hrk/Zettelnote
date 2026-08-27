@@ -1,8 +1,14 @@
 // ============================================================
-// 関連メモツリー表示(フェーズ4: レイアウト最適化)
+// 関連メモツリー表示(フェーズ5: ゴーストノード)
 //
 // tmp/関連メモツリー表示の導入提案.md 参照。編集中のメモを中心に、
 // 意味的類似度の高いメモを放射状に配置して表示する全画面オーバーレイ。
+//
+// フェーズ5のスコープ(3.6): 角度補正(フェーズ4)でも緩和しきれない、
+// 角度差が大きい(≒対角線上など著しく離れた)ノード間の横断リンクは、
+// 長い線を引く代わりに接続先の近くに相手ノードの複製(ゴーストノード)を
+// 表示する。判定基準は「角度差が一定以上」というシンプルな条件のみ
+// (フローチャートのオフページコネクタと同じ考え方)
 //
 // フェーズ4のスコープ(3.6):
 // - 新規ノード配置時の角度補正: 横断リンク(フェーズ3)は階層展開が
@@ -18,8 +24,7 @@
 //   d属性はcalc()を解釈できないため、コンテナの実ピクセルサイズを
 //   ResizeObserverで測定し、絶対座標で描画している
 //
-// ゴーストノード(フェーズ5)・ノードクリックの再センタリング
-// (フェーズ6)・拡大縮小(フェーズ8)は未実装
+// ノードクリックの再センタリング(フェーズ6)・拡大縮小(フェーズ8)は未実装
 //
 // 接続ルールの閾値について: 自前の閾値ロジックは実装していない。
 // mpnetの vectorSearch (electron/embeddingCatalog.js) が既に
@@ -43,6 +48,12 @@ const NODE_CAP = 30;
 const CHILD_ARC = Math.PI * 0.5;
 /** 横断リンクによる角度補正の強さ(0=補正無し、1=完全に平均角度へ) */
 const ANGLE_CORRECTION_PULL = 0.3;
+/** この角度差(ラジアン)を超える横断リンクはゴーストノード化する(3.6) */
+const GHOST_ANGLE_THRESHOLD = Math.PI * 0.6;
+/** ゴーストノードをアンカーからどれだけ離すか(px) */
+const GHOST_OFFSET_RADIUS = 80;
+/** ゴーストノードをアンカー自身の角度から少しずらす量(ラジアン。アンカー自身の子ノードと重なりにくくするため) */
+const GHOST_OFFSET_ANGLE = Math.PI * 0.22;
 
 interface TreeNode {
   uid: string;
@@ -57,6 +68,16 @@ interface CrossLink {
   a: string;
   b: string;
   score: number;
+}
+
+interface GhostNode {
+  /** ゴーストの元になっている実ノードのuid(クリック時に開くメモ) */
+  uid: string;
+  title: string;
+  /** どのノードの近くに表示するゴーストか(Reactキー・線の起点にも使う) */
+  anchorUid: string;
+  x: number;
+  y: number;
 }
 
 /** 親子関係(発見経路)のペアを正規化したキーで管理する(横断リンクと重複させないため) */
@@ -115,6 +136,13 @@ function circularBlend(original: number, neighborAngles: number[], pull: number)
   return Math.atan2(by, bx);
 }
 
+/** 2つの角度の差(0〜π。円環をまたぐ場合も正しく最短差を返す) */
+function angleDiff(a: number, b: number): number {
+  let d = Math.abs(a - b) % (2 * Math.PI);
+  if (d > Math.PI) d = 2 * Math.PI - d;
+  return d;
+}
+
 /** P1→P2を結ぶ緩いベジェ曲線のpath d属性を作る */
 function curvedPath(x1: number, y1: number, x2: number, y2: number): string {
   const mx = (x1 + x2) / 2;
@@ -140,6 +168,7 @@ function TreeNodeButton({
   y,
   width,
   opacity,
+  ghost = false,
   onClick,
   children,
 }: {
@@ -147,6 +176,8 @@ function TreeNodeButton({
   y: number;
   width: number;
   opacity: number;
+  /** ゴーストノード(複製表示)の場合、破線・半透明の見た目にする(3.6) */
+  ghost?: boolean;
   onClick: () => void;
   children: React.ReactNode;
 }) {
@@ -166,7 +197,11 @@ function TreeNodeButton({
         opacity: mounted ? opacity : 0,
         transition: 'opacity 300ms ease-out, left 400ms ease-out, top 400ms ease-out',
       }}
-      className="absolute -translate-x-1/2 -translate-y-1/2 rounded-xl ring-1 ring-white/10 bg-[#12151f]/90 px-3 py-2 text-left shadow-xl shadow-black/40 backdrop-blur-xl hover:scale-[1.04] hover:ring-indigo-400/40"
+      className={
+        ghost
+          ? 'absolute -translate-x-1/2 -translate-y-1/2 rounded-xl border border-dashed border-white/20 bg-[#12151f]/50 px-3 py-2 text-left backdrop-blur-sm hover:border-indigo-400/40'
+          : 'absolute -translate-x-1/2 -translate-y-1/2 rounded-xl ring-1 ring-white/10 bg-[#12151f]/90 px-3 py-2 text-left shadow-xl shadow-black/40 backdrop-blur-xl hover:scale-[1.04] hover:ring-indigo-400/40'
+      }
     >
       {children}
     </button>
@@ -378,6 +413,29 @@ export default function NoteTreeView({
     [...relPosByUid.entries()].map(([uid, p]) => [uid, { x: cx + p.x, y: cy + p.y }]),
   );
 
+  // ゴーストノード(3.6・フェーズ5): 角度差が大きい横断リンクは、長い線を
+  // 引く代わりにアンカー(a)の近くにb の複製を表示する。中心が絡む横断
+  // リンクは半径0(=常に短い線)のため対象外にする。線を引く先は
+  // ghostPosByLinkKey にあればそちらを優先する(実ノードへの長い線は引かない)
+  const angleByUid = new Map<string, number>(
+    nodes.map((n) => [n.uid, adjustedAngleByUid.get(n.uid) ?? n.angle]),
+  );
+  const ghosts: GhostNode[] = [];
+  const ghostPosByLinkKey = new Map<string, { x: number; y: number }>();
+  for (const link of crossLinks) {
+    if (link.a === center.uid || link.b === center.uid) continue;
+    const angleA = angleByUid.get(link.a);
+    const angleB = angleByUid.get(link.b);
+    const anchorPos = absPosByUid.get(link.a);
+    if (angleA == null || angleB == null || !anchorPos) continue;
+    if (angleDiff(angleA, angleB) < GHOST_ANGLE_THRESHOLD) continue;
+    const offset = polarToXY(GHOST_OFFSET_RADIUS, angleA + GHOST_OFFSET_ANGLE);
+    const ghostPos = { x: anchorPos.x + offset.x, y: anchorPos.y + offset.y };
+    const bTitle = nodes.find((n) => n.uid === link.b)?.title ?? '';
+    ghosts.push({ uid: link.b, title: bTitle, anchorUid: link.a, ...ghostPos });
+    ghostPosByLinkKey.set(pairKey(link.a, link.b), ghostPos);
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0b0d14]">
       <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
@@ -406,11 +464,14 @@ export default function NoteTreeView({
 
         {areaSize.w > 0 && (
           <>
-            {/* 横断リンク(3.5): メインの線より下のレイヤーに、細く・薄く曲線で描画する */}
+            {/* 横断リンク(3.5): メインの線より下のレイヤーに、細く・薄く曲線で描画する。
+                ゴーストノード(フェーズ5)がある場合は、実ノードではなく
+                ゴーストの位置へ短い線を引く */}
             <svg className="pointer-events-none absolute inset-0 h-full w-full">
               {crossLinks.map((link) => {
                 const posA = absPosByUid.get(link.a);
-                const posB = absPosByUid.get(link.b);
+                const posB =
+                  ghostPosByLinkKey.get(pairKey(link.a, link.b)) ?? absPosByUid.get(link.b);
                 if (!posA || !posB) return null;
                 return (
                   <path
@@ -476,6 +537,25 @@ export default function NoteTreeView({
             </TreeNodeButton>
           );
         })}
+
+        {/* ゴーストノード(3.6・フェーズ5): 角度差が大きい横断リンクの
+            複製表示。本体と見分けがつくよう破線・半透明にし、
+            クリック時の挙動は本体と同じにする */}
+        {ghosts.map((g) => (
+          <TreeNodeButton
+            key={`ghost-${g.anchorUid}-${g.uid}`}
+            x={g.x}
+            y={g.y}
+            width={11 * 16 * 0.8}
+            opacity={0.7}
+            ghost
+            onClick={() => handleNodeClick(g.uid)}
+          >
+            <div className="truncate text-[11px] text-slate-400">
+              ⇢ {g.title || t('common.untitled')}
+            </div>
+          </TreeNodeButton>
+        ))}
       </div>
     </div>
   );
