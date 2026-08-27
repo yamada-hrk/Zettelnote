@@ -39,8 +39,8 @@ wait_healthy() {
 echo "==> イメージをビルド"
 $COMPOSE build
 
-echo "==> db・landing を通常通り更新"
-$COMPOSE up -d db landing
+echo "==> db・landing・logsidecar を通常通り更新"
+$COMPOSE up -d db landing logsidecar
 
 echo "==> api を再作成"
 $COMPOSE up -d --no-deps api

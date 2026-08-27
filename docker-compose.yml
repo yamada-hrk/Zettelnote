@@ -102,5 +102,21 @@ services:
       - "8790:80"
     restart: unless-stopped
 
+  # ログ収集サイドカー(tmp/今後のタスクリスト.md「ログの永続化と
+  # ローテーション」参照)。docker.sock経由でapi・api2・landingの
+  # 標準出力ログを継続的に読み取り、./logs 配下へ永続化・日次
+  # ローテーションする。対象コンテナ自身にはファイル書き込み・
+  # ローテーションのロジックを持たせていない(api/api2の2台構成でも、
+  # 各コンテナが個別にファイル・ローテーションを管理する必要が無い)
+  logsidecar:
+    build:
+      context: ./logsidecar
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./logs:/logs
+    environment:
+      TARGET_CONTAINERS: "zettelnote-landing-1 zettelnote-api-1 zettelnote-api2-1"
+    restart: unless-stopped
+
 volumes:
   zettel-db:
