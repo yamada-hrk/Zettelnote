@@ -37,7 +37,10 @@
     "title": "🌳 Related notes tree",
     "close": "Close",
     "loading": "Searching for related notes…",
-    "expanding": "Expanding…"
+    "expanding": "Expanding…",
+    "refresh": "Refresh",
+    "modelSwitchingBlocked": "Unavailable while switching models",
+    "noteDeleted": "This note couldn't be found (it may have been deleted on another device)"
   },
   "recommend": {
     "computing": "Computing…",

@@ -37,7 +37,10 @@
     "title": "🌳 関連メモツリー",
     "close": "閉じる",
     "loading": "関連メモを検索中…",
-    "expanding": "展開中…"
+    "expanding": "展開中…",
+    "refresh": "更新",
+    "modelSwitchingBlocked": "モデル切り替え中は利用できません",
+    "noteDeleted": "このメモは見つかりませんでした(他の端末で削除された可能性があります)"
   },
   "recommend": {
     "computing": "計算中…",

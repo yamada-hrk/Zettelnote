@@ -1,8 +1,23 @@
 // ============================================================
-// 関連メモツリー表示(フェーズ6: 操作性)
+// 関連メモツリー表示(フェーズ7: データの鮮度)
 //
 // tmp/関連メモツリー表示の導入提案.md 参照。編集中のメモを中心に、
 // 意味的類似度の高いメモを放射状に配置して表示する全画面オーバーレイ。
+//
+// フェーズ7のスコープ(3.1・3.8):
+// - ツリーはスナップショット。表示中は他端末からの同期更新
+//   (メモ内容・有効なモデルの選択含む)を反映しない。最新化したい
+//   場合は更新ボタン(centerUidが同じでも展開useEffectを再実行させる
+//   refreshKeyをインクリメントするだけ)か、ノードクリックによる
+//   再センタリングを使う
+// - モデル切り替え(全メモ再計算)中は、起動ボタン(NotesApp.tsx側)・
+//   更新ボタン・再センタリングをすべてブロックする。新旧モデルの
+//   ベクトルが混在した状態で展開してしまうのを防ぐため
+// - 中心(または再センタリング先)のメモが見つからない場合
+//   (他端末で削除されていた場合)は、フォールバック先を決める必要が
+//   無いようエラー表示に留める。この検知は常時のバックグラウンド監視
+//   ではなく、展開処理が走るタイミング(初回表示・更新・再センタリング)
+//   でのみ行われる
 //
 // フェーズ6のスコープ(3.7):
 // - 子ノード(ゴースト含む)クリック: 再センタリング。onOpen()が
@@ -102,6 +117,8 @@ interface Props {
   notes: Note[];
   centerUid: string;
   modelId: string;
+  /** モデル切り替え(全メモ再計算)中は起動・更新・再センタリングをブロックする(3.8) */
+  modelSwitching: boolean;
   onOpen: (uid: string) => void;
   onClose: () => void;
 }
@@ -225,6 +242,7 @@ export default function NoteTreeView({
   notes,
   centerUid,
   modelId,
+  modelSwitching,
   onOpen,
   onClose,
 }: Props) {
@@ -232,6 +250,9 @@ export default function NoteTreeView({
   const [expanding, setExpanding] = useState(true);
   const [nodes, setNodes] = useState<TreeNode[]>([]);
   const [crossLinks, setCrossLinks] = useState<CrossLink[]>([]);
+  // 更新ボタン(3.1・3.8)。centerUidが変わらなくても、これをインクリメント
+  // すると展開useEffectが再実行され、開き直しと同じ扱いで取り直せる
+  const [refreshKey, setRefreshKey] = useState(0);
   const center = notes.find((n) => n.uid === centerUid) ?? null;
 
   // 曲線描画にはcalc()の効かない絶対px座標が要るため、描画エリアの
@@ -249,7 +270,14 @@ export default function NoteTreeView({
   }, []);
 
   useEffect(() => {
-    if (!center) return;
+    // 中心(または再センタリング先)のメモが他端末で削除されていた場合(3.8)。
+    // 常時監視ではなく、この展開処理が走るタイミング(初回表示・更新
+    // ボタン・再センタリング)でのみ検知する。実際のエラー表示は
+    // レンダー時に!centerを直接見て行うため、ここでは展開しないだけで良い
+    if (!center) {
+      setExpanding(false);
+      return;
+    }
     let cancelled = false;
     setExpanding(true);
     setNodes([]);
@@ -322,7 +350,7 @@ export default function NoteTreeView({
     return () => {
       cancelled = true;
     };
-  }, [center, notes, modelId]);
+  }, [center, notes, modelId, refreshKey]);
 
   // 横断リンク(3.5): 階層展開が完了した後、表示済み全ノード間の
   // ペア比較を行う。既存のvectorSearchを「そのノードをクエリ、他の
@@ -405,7 +433,27 @@ export default function NoteTreeView({
     return map;
   }, [nodes, crossLinks]);
 
-  if (!center) return null;
+  // 中心(または再センタリング先)のメモが他端末で削除されていた場合(3.8)。
+  // どのメモにフォールバックするかを決める必要が無いよう、エラー表示に
+  // 留める(閉じることはできる)
+  if (!center) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-[#0b0d14]">
+        <div className="flex items-center justify-between border-b border-white/5 px-5 py-3">
+          <h2 className="text-sm font-bold text-slate-200">{t('noteTree.title')}</h2>
+          <button
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+          >
+            ✕ {t('noteTree.close')}
+          </button>
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <p className="text-sm text-slate-400">{t('noteTree.noteDeleted')}</p>
+        </div>
+      </div>
+    );
+  }
 
   // 中心のメモをクリック: 既にこのメモが選択されている状態なので、
   // ツリー表示を閉じてEditorへ戻るだけで良い(3.7)
@@ -419,8 +467,10 @@ export default function NoteTreeView({
   // (centerUidの変化を検知して)自動的に新しい中心から再展開する。
   // onClose()は呼ばない(ツリー表示は開いたまま)。onOpen()は内部で
   // 閲覧履歴(useNoteHistory)にも記録するため、ツリー内で辿った経路を
-  // 既存のAlt+←/→でそのまま遡れる
+  // 既存のAlt+←/→でそのまま遡れる。モデル切り替え中は取り直しを
+  // ブロックする(3.8)
   const handleChildClick = (uid: string) => {
+    if (modelSwitching) return;
     onOpen(uid);
   };
 
@@ -471,13 +521,28 @@ export default function NoteTreeView({
               {t('noteTree.expanding')}
             </span>
           )}
+          {modelSwitching && (
+            <span className="ml-2 text-xs font-normal text-amber-400/80">
+              {t('noteTree.modelSwitchingBlocked')}
+            </span>
+          )}
         </h2>
-        <button
-          onClick={onClose}
-          className="rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
-        >
-          ✕ {t('noteTree.close')}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={modelSwitching || expanding}
+            title={modelSwitching ? t('noteTree.modelSwitchingBlocked') : undefined}
+            className="rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+          >
+            ⟳ {t('noteTree.refresh')}
+          </button>
+          <button
+            onClick={onClose}
+            className="rounded-lg px-3 py-1.5 text-sm text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+          >
+            ✕ {t('noteTree.close')}
+          </button>
+        </div>
       </div>
 
       <div ref={areaRef} className="relative flex-1 overflow-hidden">

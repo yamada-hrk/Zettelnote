@@ -574,7 +574,9 @@ export default function NotesApp({
                 <div className="flex-1" />
                 <button
                   onClick={() => setTreeViewOpen(true)}
-                  className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200"
+                  disabled={modelSwitching}
+                  title={modelSwitching ? t('noteTree.modelSwitchingBlocked') : undefined}
+                  className="rounded-md px-2 py-1 text-xs text-slate-400 transition-colors hover:bg-white/10 hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                 >
                   {t('editor.treeView')}
                 </button>
@@ -700,6 +702,7 @@ export default function NotesApp({
           notes={notes}
           centerUid={selected.uid}
           modelId={activeModelId}
+          modelSwitching={modelSwitching}
           onOpen={(uid) => selectNote(uid, true)}
           onClose={() => setTreeViewOpen(false)}
         />
